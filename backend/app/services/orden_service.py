@@ -91,6 +91,7 @@ def agregar_item(db: Session, orden_id: int, data: ItemCotizacionRequest) -> Ite
     db.add(item)
     if orden.estado == "PERITAJE":
         orden.estado = "COTIZACION"
+    db.flush()  # necesario para que la query de _recalcular_totales vea el nuevo ítem
     _recalcular_totales(db, orden)
     db.commit()
     db.refresh(item)
@@ -129,6 +130,7 @@ def eliminar_item(db: Session, orden_id: int, item_id: int) -> None:
     if not item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ítem no encontrado")
     db.delete(item)
+    db.flush()  # necesario para que la query de _recalcular_totales no vea el ítem eliminado
     _recalcular_totales(db, orden)
     db.commit()
 

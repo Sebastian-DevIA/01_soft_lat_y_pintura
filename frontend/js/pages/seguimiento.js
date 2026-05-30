@@ -9,7 +9,7 @@ export const seguimiento = {
   async render(container) {
     container.innerHTML = renderLoader();
     try {
-      const ordenes = await api.ordenes.list('?limite=100');
+      const ordenes = await api.ordenes.list('?limit=100');
       const activas = ordenes.filter(o => ['EN_PROCESO'].includes(o.estado));
 
       // Cargar fases de cada orden activa

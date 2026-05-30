@@ -2,7 +2,9 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
+import app.models  # noqa: F401 — registrar todos los modelos en Base (antes que todo)
 from app.main import app
 from app.database import Base
 from app.dependencies.db import get_db
@@ -12,7 +14,9 @@ from app.utils.security import hash_password
 SQLALCHEMY_TEST_URL = "sqlite:///:memory:"
 
 engine_test = create_engine(
-    SQLALCHEMY_TEST_URL, connect_args={"check_same_thread": False}
+    SQLALCHEMY_TEST_URL,
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
 )
 SessionTest = sessionmaker(autocommit=False, autoflush=False, bind=engine_test)
 

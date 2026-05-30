@@ -1,5 +1,6 @@
 from datetime import datetime
 from pydantic import BaseModel, field_validator
+from app.schemas.factura import FacturaResponse
 
 
 class OrdenCreateRequest(BaseModel):
@@ -96,6 +97,7 @@ class OrdenDetalleResponse(BaseModel):
     fecha_estimada_entrega: datetime | None
     fecha_entrega_real: datetime | None
     items: list[ItemCotizacionResponse]
+    factura: FacturaResponse | None = None
     created_at: datetime
     updated_at: datetime
 
