@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    name: Lint (flake8 + black)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Instalar dependencias de linting
+        run: pip install flake8 black
+      - name: flake8
+        run: flake8 backend/app/ --max-line-length=100 --exclude=__pycache__
+      - name: black (verificar formato)
+        run: black --check backend/app/
+
+  test:
+    name: Tests (pytest)
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Instalar dependencias
+        run: pip install -r requirements-dev.txt
+      - name: Ejecutar tests
+        run: pytest backend/tests/ -v --cov=app --cov-report=term-missing
+        env:
+          SECRET_KEY: test-secret-key-for-ci-only
+          DATABASE_URL: sqlite:///:memory:
+          DEBUG: "true"

@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Factura {{ factura.numero_factura }}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; font-size: 13px; color: #222; padding: 30px; }
+    .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; border-bottom: 3px solid #1a237e; padding-bottom: 20px; }
+    .empresa h1 { font-size: 24px; color: #1a237e; }
+    .empresa p { color: #555; font-size: 12px; }
+    .factura-info { text-align: right; }
+    .factura-info .numero { font-size: 20px; font-weight: bold; color: #1a237e; }
+    .factura-info .estado { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: bold; margin-top: 5px; }
+    .estado-PENDIENTE { background: #fff3e0; color: #e65100; }
+    .estado-PARCIAL { background: #e3f2fd; color: #1565c0; }
+    .estado-PAGADA { background: #e8f5e9; color: #2e7d32; }
+    .seccion { margin-bottom: 20px; }
+    .seccion h3 { font-size: 12px; text-transform: uppercase; color: #555; margin-bottom: 8px; border-bottom: 1px solid #e0e0e0; padding-bottom: 4px; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .campo { margin-bottom: 6px; }
+    .campo label { font-size: 11px; color: #888; display: block; }
+    .campo span { font-weight: 500; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    thead th { background: #1a237e; color: white; padding: 8px 10px; text-align: left; font-size: 12px; }
+    tbody tr:nth-child(even) { background: #f5f5f5; }
+    tbody td { padding: 8px 10px; border-bottom: 1px solid #e0e0e0; }
+    .text-right { text-align: right; }
+    .totales { margin-top: 15px; display: flex; justify-content: flex-end; }
+    .totales table { width: 320px; }
+    .totales td { padding: 6px 10px; }
+    .totales tr.total-final { background: #1a237e; color: white; font-weight: bold; }
+    .pie { margin-top: 40px; display: flex; justify-content: space-between; align-items: flex-end; }
+    .firma-box { border-top: 1px solid #333; width: 180px; text-align: center; padding-top: 6px; font-size: 11px; color: #555; }
+    .nota { font-size: 11px; color: #888; margin-top: 20px; text-align: center; border-top: 1px solid #e0e0e0; padding-top: 10px; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="empresa">
+      <h1>Taller LatonPaint</h1>
+      <p>Latonería &amp; Pintura Automotriz</p>
+      <p>Tel: (000) 000-0000</p>
+    </div>
+    <div class="factura-info">
+      <div class="numero">{{ factura.numero_factura }}</div>
+      <p>Emisión: {{ factura.fecha_emision.strftime('%d/%m/%Y') }}</p>
+      {% if factura.fecha_estimada_entrega %}
+      <p>Entrega estimada: {{ factura.fecha_estimada_entrega.strftime('%d/%m/%Y') }}</p>
+      {% endif %}
+      <div class="estado estado-{{ factura.estado }}">{{ factura.estado }}</div>
+    </div>
+  </div>
+
+  <div class="grid-2 seccion">
+    <div>
+      <h3>Cliente</h3>
+      {% if cliente %}
+      <div class="campo"><label>Nombre</label><span>{{ cliente.nombre }} {{ cliente.apellido }}</span></div>
+      <div class="campo"><label>Cédula / RUC</label><span>{{ cliente.cedula_ruc }}</span></div>
+      <div class="campo"><label>Teléfono</label><span>{{ cliente.telefono }}</span></div>
+      {% if cliente.email %}<div class="campo"><label>Email</label><span>{{ cliente.email }}</span></div>{% endif %}
+      {% endif %}
+    </div>
+    <div>
+      <h3>Vehículo</h3>
+      {% if vehiculo %}
+      <div class="campo"><label>Placa</label><span>{{ vehiculo.placa }}</span></div>
+      <div class="campo"><label>Marca / Modelo</label><span>{{ vehiculo.marca }} {{ vehiculo.modelo }}</span></div>
+      {% if vehiculo.color %}<div class="campo"><label>Color</label><span>{{ vehiculo.color }}</span></div>{% endif %}
+      {% if vehiculo.anio %}<div class="campo"><label>Año</label><span>{{ vehiculo.anio }}</span></div>{% endif %}
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="seccion">
+    <h3>Detalle de Reparación</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Área / Descripción</th>
+          <th class="text-right">Cantidad</th>
+          <th class="text-right">Precio Unit.</th>
+          <th class="text-right">Subtotal</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td><strong>{{ item.area_vehiculo }}</strong><br><small>{{ item.descripcion }}</small></td>
+          <td class="text-right">{{ item.cantidad }}</td>
+          <td class="text-right">${{ "%.2f"|format(item.precio_unitario) }}</td>
+          <td class="text-right">${{ "%.2f"|format(item.subtotal) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="totales">
+    <table>
+      <tr>
+        <td>Subtotal</td>
+        <td class="text-right">${{ "%.2f"|format(orden.total_cotizado) }}</td>
+      </tr>
+      {% if orden.descuento_porcentaje > 0 %}
+      <tr>
+        <td>Descuento ({{ orden.descuento_porcentaje }}%)</td>
+        <td class="text-right">-${{ "%.2f"|format(orden.total_cotizado - factura.monto_total) }}</td>
+      </tr>
+      {% endif %}
+      <tr class="total-final">
+        <td>TOTAL</td>
+        <td class="text-right">${{ "%.2f"|format(factura.monto_total) }}</td>
+      </tr>
+      <tr>
+        <td>Adelanto (50%)</td>
+        <td class="text-right">${{ "%.2f"|format(factura.monto_adelanto) }}</td>
+      </tr>
+      <tr>
+        <td>Saldo al entregar (50%)</td>
+        <td class="text-right">${{ "%.2f"|format(factura.monto_saldo) }}</td>
+      </tr>
+      <tr>
+        <td>Pagado</td>
+        <td class="text-right">${{ "%.2f"|format(factura.monto_pagado) }}</td>
+      </tr>
+      <tr>
+        <td><strong>Saldo pendiente</strong></td>
+        <td class="text-right"><strong>${{ "%.2f"|format(factura.monto_total - factura.monto_pagado) }}</strong></td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="pie">
+    <div class="firma-box">Firma del Cliente</div>
+    <div class="firma-box">Autorizado por</div>
+  </div>
+
+  <p class="nota">
+    El vehículo será entregado únicamente al cancelar el saldo pendiente.<br>
+    Gracias por confiar en Taller LatonPaint.
+  </p>
+
+</body>
+</html>

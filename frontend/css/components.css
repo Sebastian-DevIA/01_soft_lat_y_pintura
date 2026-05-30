@@ -1,0 +1,253 @@
+/* ── Formularios ────────────────────────────────────────────────────────── */
+.form-group { margin-bottom: 16px; }
+.form-group label { display: block; font-size: .85rem; font-weight: 500; margin-bottom: 5px; color: #444; }
+.form-control {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: #fff;
+  transition: border-color .15s, box-shadow .15s;
+}
+.form-control:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(21,101,192,.15);
+}
+.form-control.is-error { border-color: var(--color-danger); }
+.form-error { font-size: .78rem; color: var(--color-danger); margin-top: 3px; }
+
+/* ── Botones ────────────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border-radius: var(--radius);
+  border: none;
+  font-size: .88rem;
+  font-weight: 500;
+  transition: background .15s, opacity .15s;
+}
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn-primary { background: var(--color-primary); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: var(--color-primary-d); }
+.btn-accent  { background: var(--color-accent); color: #fff; }
+.btn-accent:hover:not(:disabled) { background: #0d47a1; }
+.btn-success { background: var(--color-success); color: #fff; }
+.btn-success:hover:not(:disabled) { background: #1b5e20; }
+.btn-danger  { background: var(--color-danger); color: #fff; }
+.btn-danger:hover:not(:disabled) { background: #b71c1c; }
+.btn-outline {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+}
+.btn-outline:hover:not(:disabled) { background: var(--color-bg); }
+.btn-sm { padding: 5px 12px; font-size: .80rem; }
+.btn-icon { padding: 6px; border-radius: 50%; }
+
+/* ── Cards ──────────────────────────────────────────────────────────────── */
+.card {
+  background: var(--color-surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: 20px;
+  border: 1px solid var(--color-border);
+}
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.card-header h3 { font-size: .95rem; font-weight: 600; }
+.card-title { font-size: 1.1rem; font-weight: 700; color: var(--color-primary); }
+
+/* Stat cards del dashboard */
+.stat-card {
+  background: var(--color-surface);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+}
+.stat-card .stat-label { font-size: .78rem; text-transform: uppercase; color: var(--color-muted); margin-bottom: 6px; }
+.stat-card .stat-value { font-size: 2rem; font-weight: 700; color: var(--color-primary); }
+
+/* ── Tablas ─────────────────────────────────────────────────────────────── */
+.table-wrapper { overflow-x: auto; }
+table.data-table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+table.data-table thead th {
+  background: #f0f0f0;
+  padding: 10px 12px;
+  text-align: left;
+  font-weight: 600;
+  color: #444;
+  border-bottom: 2px solid var(--color-border);
+  white-space: nowrap;
+}
+table.data-table tbody td { padding: 10px 12px; border-bottom: 1px solid var(--color-border); }
+table.data-table tbody tr:hover { background: #fafafa; }
+table.data-table tbody tr:last-child td { border-bottom: none; }
+
+/* ── Badges de estado ───────────────────────────────────────────────────── */
+.badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: .72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+}
+.badge-PERITAJE   { background: #e3f2fd; color: #1565c0; }
+.badge-COTIZACION { background: #fff3e0; color: #e65100; }
+.badge-APROBACION { background: #f3e5f5; color: #6a1b9a; }
+.badge-EN_PROCESO { background: #e8f5e9; color: #2e7d32; }
+.badge-ENTREGADO  { background: #e0e0e0; color: #424242; }
+.badge-CANCELADO  { background: #ffebee; color: #c62828; }
+.badge-PENDIENTE  { background: #fff3e0; color: #e65100; }
+.badge-PARCIAL    { background: #e3f2fd; color: #1565c0; }
+.badge-PAGADA     { background: #e8f5e9; color: #2e7d32; }
+
+/* ── Kanban ─────────────────────────────────────────────────────────────── */
+.kanban-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; min-height: 500px; }
+.kanban-col {
+  background: #f0f0f0;
+  border-radius: var(--radius);
+  padding: 12px;
+}
+.kanban-col-header {
+  font-weight: 600;
+  font-size: .85rem;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--color-muted);
+  margin-bottom: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.kanban-col-header .count {
+  background: #ddd;
+  border-radius: 20px;
+  padding: 1px 8px;
+  font-size: .75rem;
+}
+.kanban-card {
+  background: #fff;
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  box-shadow: var(--shadow-sm);
+  border-left: 3px solid var(--color-primary);
+  cursor: pointer;
+  transition: box-shadow .15s;
+}
+.kanban-card:hover { box-shadow: var(--shadow); }
+.kanban-card .placa { font-weight: 700; font-size: .95rem; }
+.kanban-card .cliente { font-size: .80rem; color: var(--color-muted); margin-top: 2px; }
+.kanban-card .info { font-size: .78rem; color: #888; margin-top: 6px; }
+
+/* ── Barra de búsqueda ──────────────────────────────────────────────────── */
+.search-bar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+  align-items: center;
+}
+.search-bar .form-control { max-width: 320px; }
+
+/* ── Tabs ───────────────────────────────────────────────────────────────── */
+.tabs { display: flex; gap: 0; border-bottom: 2px solid var(--color-border); margin-bottom: 20px; }
+.tab-btn {
+  padding: 10px 20px;
+  border: none;
+  background: none;
+  color: var(--color-muted);
+  font-size: .88rem;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: color .15s, border-color .15s;
+}
+.tab-btn:hover { color: var(--color-text); }
+.tab-btn.active { color: var(--color-primary); border-bottom-color: var(--color-primary); font-weight: 600; }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ── Modal ──────────────────────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+.modal {
+  background: #fff;
+  border-radius: var(--radius);
+  width: 520px;
+  max-width: 95vw;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0,0,0,.2);
+}
+.modal-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.modal-header h3 { font-size: 1rem; }
+.modal-body { padding: 20px; }
+.modal-footer { padding: 14px 20px; border-top: 1px solid var(--color-border); display: flex; gap: 10px; justify-content: flex-end; }
+
+/* ── Toast ──────────────────────────────────────────────────────────────── */
+#toast-container { position: fixed; bottom: 24px; right: 24px; display: flex; flex-direction: column; gap: 8px; z-index: 200; }
+.toast {
+  padding: 12px 18px;
+  border-radius: var(--radius);
+  color: #fff;
+  font-size: .88rem;
+  box-shadow: var(--shadow);
+  animation: slideIn .25s ease;
+  min-width: 240px;
+}
+.toast-success { background: var(--color-success); }
+.toast-error   { background: var(--color-danger); }
+.toast-info    { background: var(--color-accent); }
+@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* ── Grid de métricas ───────────────────────────────────────────────────── */
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 24px; }
+
+/* ── Totales de cotización ──────────────────────────────────────────────── */
+.totales-box {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  max-width: 360px;
+  margin-left: auto;
+  margin-top: 12px;
+}
+.totales-box .total-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: .88rem; }
+.totales-box .total-final { font-weight: 700; font-size: 1rem; border-top: 1px solid var(--color-border); padding-top: 8px; margin-top: 4px; }
+
+/* ── Wizard pasos ───────────────────────────────────────────────────────── */
+.wizard-steps { display: flex; gap: 0; margin-bottom: 28px; }
+.wizard-step {
+  flex: 1;
+  text-align: center;
+  padding: 10px 4px;
+  font-size: .82rem;
+  color: var(--color-muted);
+  border-bottom: 3px solid var(--color-border);
+  position: relative;
+}
+.wizard-step.active { color: var(--color-primary); border-bottom-color: var(--color-primary); font-weight: 600; }
+.wizard-step.done   { color: var(--color-success); border-bottom-color: var(--color-success); }

@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Taller LatonPaint</title>
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/components.css">
+</head>
+<body>
+
+  <!-- Pantalla de Login -->
+  <div id="login-screen">
+    <div class="login-card">
+      <h2>Taller LatonPaint</h2>
+      <p>Sistema de Gestión del Taller</p>
+      <form id="login-form">
+        <div class="form-group">
+          <label for="username">Usuario</label>
+          <input class="form-control" id="username" type="text" autocomplete="username" required>
+        </div>
+        <div class="form-group">
+          <label for="password">Contraseña</label>
+          <input class="form-control" id="password" type="password" autocomplete="current-password" required>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%">Ingresar</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Layout principal (oculto hasta autenticarse) -->
+  <div id="app" class="hidden">
+    <aside id="sidebar">
+      <div class="logo">
+        <h2>🔧 LatonPaint</h2>
+        <small>Gestión del Taller</small>
+      </div>
+      <nav>
+        <a href="#/dashboard">📊 Dashboard</a>
+        <a href="#/ordenes">📋 Órdenes</a>
+        <a href="#/seguimiento">🚗 Seguimiento</a>
+        <a href="#/clientes">👤 Clientes</a>
+        <a href="#/personal">👷 Personal</a>
+      </nav>
+      <div class="sidebar-footer">
+        <span id="user-display"></span><br>
+        <a href="#" id="btn-logout" style="color:rgba(255,255,255,.6);font-size:.78rem">Cerrar sesión</a>
+      </div>
+    </aside>
+
+    <div id="content">
+      <header id="header">
+        <h1 id="header-title">Dashboard</h1>
+        <div class="user-info">
+          <span id="header-user"></span>
+        </div>
+      </header>
+      <main id="main"></main>
+    </div>
+  </div>
+
+  <!-- Contenedor de notificaciones toast -->
+  <div id="toast-container"></div>
+
+  <script type="module">
+    import { isAuthenticated, logout, getCurrentUser, setupLoginForm } from './js/auth.js';
+    import { initRouter, register } from './js/router.js';
+    import { dashboard }   from './js/pages/dashboard.js';
+    import { clientes }    from './js/pages/clientes.js';
+    import { ordenes }     from './js/pages/ordenes.js';
+    import { seguimiento } from './js/pages/seguimiento.js';
+    import { personal }    from './js/pages/personal.js';
+
+    // Registrar rutas
+    register('#/dashboard',   dashboard);
+    register('#/ordenes',     ordenes);
+    register('#/seguimiento', seguimiento);
+    register('#/clientes',    clientes);
+    register('#/personal',    personal);
+
+    // Setup inicial
+    setupLoginForm();
+
+    async function showApp() {
+      document.getElementById('login-screen').classList.add('hidden');
+      document.getElementById('app').classList.remove('hidden');
+      try {
+        const user = await getCurrentUser();
+        document.getElementById('user-display').textContent = user.nombre_completo || user.username;
+        document.getElementById('header-user').textContent = user.username;
+      } catch {}
+    }
+
+    function showLogin() {
+      document.getElementById('login-screen').classList.remove('hidden');
+      document.getElementById('app').classList.add('hidden');
+    }
+
+    document.getElementById('btn-logout').addEventListener('click', (e) => {
+      e.preventDefault();
+      logout();
+      showLogin();
+    });
+
+    // Escuchar cambios de hash para mostrar/ocultar login
+    window.addEventListener('hashchange', () => {
+      if (isAuthenticated()) showApp();
+      else showLogin();
+    });
+
+    // Iniciar
+    if (isAuthenticated()) {
+      showApp();
+      initRouter();
+    } else {
+      showLogin();
+      // Iniciar el router de todas formas para manejar el #/login
+      initRouter();
+    }
+
+    // Manejar login exitoso
+    document.addEventListener('login-success', () => {
+      showApp();
+      initRouter();
+    });
+  </script>
+</body>
+</html>
