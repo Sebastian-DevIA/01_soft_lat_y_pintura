@@ -3,11 +3,27 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Sistema de gestión operacional para taller de latonería y pintura automotriz. Interfaz Liquid Glass.">
+  <meta name="theme-color" content="#1a237e">
   <title>Taller LatonPaint</title>
+  <!-- Favicon emoji inline (sin assets externos) -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔧</text></svg>">
   <link rel="stylesheet" href="css/main.css">
   <link rel="stylesheet" href="css/components.css">
 </head>
 <body>
+
+  <!-- Filtro SVG de refracción "liquid glass" (opcional, vía clase .glass-refract).
+       feTurbulence genera ruido orgánico; feDisplacementMap desplaza los píxeles
+       del backdrop para simular la distorsión real del vidrio líquido. -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <filter id="liquid-glass" x="-20%" y="-20%" width="140%" height="140%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.008 0.012" numOctaves="2" seed="7" result="noise"/>
+      <feGaussianBlur in="noise" stdDeviation="1.2" result="softNoise"/>
+      <feDisplacementMap in="SourceGraphic" in2="softNoise" scale="14"
+                         xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </svg>
 
   <!-- Pantalla de Login -->
   <div id="login-screen">
