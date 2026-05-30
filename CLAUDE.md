@@ -161,6 +161,25 @@ backend/
 - JWT en `localStorage` (clave: `taller_token`)
 - Sin Bootstrap ni Tailwind — CSS propio en `frontend/css/`
 
+### Tema "Liquid Glass" (vidrio tipo Apple, CSS puro)
+
+- **NO usar React** ni la librería `liquid-glass-react`: el proyecto es Vanilla.
+  El efecto se logra solo con CSS + un filtro SVG.
+- Variables del vidrio en `frontend/css/main.css` (`:root`): `--glass-bg`,
+  `--glass-bg-strong`, `--glass-border`, `--glass-blur`, `--glass-shadow`, etc.
+  **Reutilizarlas** en vez de hardcodear `rgba()`/blur al crear componentes nuevos.
+- Patrón de superficie de vidrio: `background: var(--glass-bg)` +
+  `backdrop-filter: blur() saturate()` + `border: 1px solid var(--glass-border)`
+  + `box-shadow: var(--glass-shadow)`. Siempre incluir el prefijo
+  `-webkit-backdrop-filter` para Safari.
+- Fondo "aurora" animado vive en `body` (`@keyframes auroraShift`).
+- Filtro SVG de refracción: `<filter id="liquid-glass">` en `frontend/index.html`.
+- **Regla de oro: legibilidad primero.** El vidrio nunca debe dificultar leer el
+  texto; mantener contraste AA. Respetar `@media (prefers-reduced-motion)`.
+- Helpers de UI en `frontend/js/utils.js`: `renderLoader()` (spinner),
+  `renderSkeleton(rows)`, `renderEmpty(msg, icon)`, `renderError(msg)` (traduce
+  errores de red), `escapeHtml(value)` (usar al inyectar datos del usuario en HTML).
+
 ### Páginas implementadas
 
 ```
@@ -213,3 +232,30 @@ black backend/app/
 - Todas las rutas excepto `POST /api/v1/auth/login` requieren JWT válido
 - Sin hardcode de credenciales en ningún archivo
 - `requirements.txt` con versiones exactas
+
+---
+
+## Equipo de agentes (sub-agentes globales)
+
+El desarrollador trabaja como una agencia de software de IA. Existe un **equipo de
+sub-agentes global** en `~/.claude/agents/` (reutilizable en todos sus proyectos),
+con un agente **líder** que orquesta el trabajo de inicio a fin:
+
+| Agente | Rol |
+|--------|-----|
+| `tech-lead` | **Líder/orquestador**: descompone el objetivo, delega vía la tool `Agent`, integra y exige validación antes de cerrar. Único con acceso a `Agent`. |
+| `backend-fastapi` | Python/FastAPI, SQLAlchemy 2.0 síncrono, Pydantic v2, Alembic. Respeta la separación routers/services/models. |
+| `frontend-web` | HTML/CSS/JS Vanilla, SPA hash-router, tema Liquid Glass, accesibilidad. |
+| `qa-tester` | pytest + httpx, StaticPool, cobertura, edge cases. Bloquea cierres con tests rojos. |
+| `automation-engineer` | Make/n8n, scripts, integraciones y webhooks. |
+| `devops-git` | GitHub Actions (lint + tests), flujo `dev`→`main`, convención de commits. |
+| `security-auditor` | Auditoría de repos públicos: secrets, JWT, validación, OWASP. |
+
+**Modo de trabajo:** el `tech-lead` recibe el objetivo, planifica con `TodoWrite`,
+delega a los especialistas, integra resultados y hace que `qa-tester` +
+`security-auditor` validen antes de cualquier commit/push.
+
+> Nota: en Claude Code los sub-agentes los invoca el agente principal; "líder de
+> equipo" = la definición `tech-lead` + orquestación. Para tareas pequeñas, el
+> agente principal puede ejecutar directamente y reservar la delegación para
+> trabajos amplios o paralelizables.

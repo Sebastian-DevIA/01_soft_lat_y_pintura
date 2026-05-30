@@ -8,6 +8,8 @@
 
 Sistema de gestión operacional para un taller de latonería y pintura automotriz. Cubre el ciclo completo del vehículo: ingreso, peritaje, cotización, aprobación, facturación, fases de trabajo y entrega.
 
+La interfaz usa un tema **Liquid Glass** (vidrio translúcido tipo Apple) implementado en **CSS puro**, sin frameworks. Ver [Interfaz — Tema Liquid Glass](#interfaz--tema-liquid-glass).
+
 > **Proyecto de portafolio** — Desarrollado por [Sebastian Miranda](https://github.com/Sebastian-DevIA) para demostrar competencias en Python, FastAPI, SQLAlchemy, Pydantic v2 y desarrollo de APIs REST.
 
 ---
@@ -145,6 +147,44 @@ PERITAJE → COTIZACION → APROBACION → EN_PROCESO → ENTREGADO
 | DELETE | `/api/v1/fases/{id}/personal/{id}`| Remover personal de fase           |
 | GET    | `/api/v1/personal/`               | Listar personal                    |
 | POST   | `/api/v1/personal/`               | Crear empleado                     |
+
+---
+
+## Interfaz — Tema Liquid Glass
+
+El frontend (SPA Vanilla, sin frameworks) está estilizado con un tema **Liquid
+Glass** inspirado en la estética de vidrio translúcido de Apple, implementado
+**100% en CSS** (no se usa la librería React `liquid-glass-react`, ya que el
+proyecto es Vanilla por diseño).
+
+**Cómo está construido:**
+
+| Técnica | Dónde |
+|---------|-------|
+| `backdrop-filter: blur() saturate()` sobre superficies translúcidas | sidebar, header, cards, modales, tablas, kanban |
+| Fondo "aurora" (mesh de gradientes radiales animados) que el vidrio refracta | `body` en `frontend/css/main.css` |
+| Bordes de luz + brillo interior superior + sombra profunda suave | variables `--glass-*` en `main.css` |
+| Filtro SVG de refracción real (`feTurbulence` + `feDisplacementMap`) | `<filter id="liquid-glass">` en `frontend/index.html` |
+| Favicon emoji inline + `theme-color` | `<head>` de `frontend/index.html` |
+
+**Archivos clave del tema:**
+- `frontend/css/main.css` — variables del vidrio, layout, fondo aurora, login.
+- `frontend/css/components.css` — vidrio aplicado a botones, cards, tablas, kanban, modales, toasts; skeletons y spinners.
+- `frontend/index.html` — filtro SVG de refracción y meta tags.
+
+**Accesibilidad y rendimiento:**
+- **Legibilidad primero**: contraste objetivo AA; el vidrio nunca dificulta leer el texto.
+- `:focus-visible` consistente y navegación por teclado.
+- `@media (prefers-reduced-motion: reduce)` desactiva las animaciones de fondo.
+- Layout responsive (el sidebar colapsa en pantallas pequeñas).
+
+### Mejoras de UX incluidas
+
+- **Estados de carga**: spinner y skeletons de vidrio mientras `fetch` resuelve.
+- **Estados vacíos y de error** claros (mensajes de red entendibles, no `Failed to fetch`).
+- **Modales accesibles**: cierre con `Escape`, clic fuera del cuadro y foco automático.
+- **Microtransiciones** sutiles en cards, filas y tabs (respetando reduced-motion).
+- Helper `escapeHtml()` en `frontend/js/utils.js` para renderizar datos del usuario de forma segura.
 
 ---
 
