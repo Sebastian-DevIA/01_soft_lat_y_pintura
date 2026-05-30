@@ -29,8 +29,14 @@ build/
 # Pytest / Coverage
 .pytest_cache/
 .coverage
+.coverage.*
 htmlcov/
 .tox/
+
+# Linters / type checkers
+.mypy_cache/
+.ruff_cache/
+.flake8_cache/
 
 # Alembic (no subir DB generada)
 backend/taller.db
@@ -44,8 +50,15 @@ backend/taller.db
 
 # OS
 .DS_Store
+.DS_Store?
+._*
 Thumbs.db
 desktop.ini
+
+# Temporales / backups
+*.tmp
+*.bak
+*.orig
 
 # Logs
 *.log
