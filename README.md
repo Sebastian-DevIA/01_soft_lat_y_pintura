@@ -14,6 +14,23 @@ La interfaz usa un tema **Liquid Glass** (vidrio translúcido tipo Apple) implem
 
 ---
 
+## Acceso rápido (demo local)
+
+| Recurso | URL / Valor |
+|---------|-------------|
+| 🖥️ **Frontend (interfaz)** | **http://localhost:8080** |
+| ⚙️ **API + Swagger** | http://localhost:8000/docs |
+| 👤 **Usuario** | `admin` |
+| 🔑 **Contraseña** | `admin123` |
+
+Levanta **siempre** ambos servidores antes de usar la app (backend en `:8000`, frontend
+en `:8080`). El paso a paso está en [Cómo correr el proyecto](#cómo-correr-el-proyecto).
+
+> ⚠️ Las credenciales `admin / admin123` son **solo para demo/desarrollo** (las crea
+> `backend/scripts/create_admin.py`). Cámbialas antes de cualquier despliegue real.
+
+---
+
 ## Flujo del Vehículo
 
 ```

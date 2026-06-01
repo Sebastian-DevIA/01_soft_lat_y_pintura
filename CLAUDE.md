@@ -265,6 +265,23 @@ black backend/app/
 
 ## Desarrollo local (entorno WSL)
 
+> **Arranque rápido (hazlo SIEMPRE al iniciar sesión, para poder ver los cambios en vivo):**
+>
+> ```bash
+> # backend (API) + frontend (UI), desde la raíz del repo en WSL
+> python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --app-dir backend &
+> python3 -m http.server 8080 --directory frontend &
+> ```
+>
+> | Recurso | URL / Valor |
+> |---------|-------------|
+> | Frontend (UI) | http://localhost:8080 |
+> | API + Swagger | http://localhost:8000/docs |
+> | **Usuario** | `admin` |
+> | **Contraseña** | `admin123` |
+>
+> Credenciales demo creadas por `backend/scripts/create_admin.py` (cambiar en producción).
+
 El proyecto vive en WSL (`/home/arcaoexdi/ao_development/01_soft_lat_y_pintura`) y se
 edita desde Windows por `\\wsl.localhost\Ubuntu\...`. Notas para correr/validar:
 
