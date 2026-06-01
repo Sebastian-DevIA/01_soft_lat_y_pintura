@@ -1,5 +1,12 @@
 import { api } from '../api.js';
-import { formatCurrency, renderLoader, renderError } from '../utils.js';
+import { formatCurrency, renderLoader, renderError, escapeHtml } from '../utils.js';
+
+// Etiqueta legible del vehículo (campos enriquecidos con fallback seguro).
+function vehiculoLabel(o) {
+  const placa = o.vehiculo_placa ? String(o.vehiculo_placa).trim() : '';
+  const desc = o.vehiculo_descripcion ? String(o.vehiculo_descripcion).trim() : '';
+  return placa || desc || `Vehículo #${o.vehiculo_id}`;
+}
 
 export const dashboard = {
   title: 'Dashboard',
@@ -42,15 +49,17 @@ export const dashboard = {
           <div class="card-header"><h3>Últimas órdenes</h3></div>
           <div class="table-wrapper">
             <table class="data-table">
-              <thead><tr><th>ID</th><th>Estado</th><th>Total</th><th>Ingreso</th></tr></thead>
+              <thead><tr><th>ID</th><th>Vehículo</th><th>Cliente</th><th>Estado</th><th>Total</th><th>Ingreso</th></tr></thead>
               <tbody>
                 ${activas.slice(0, 10).map(o => `
                   <tr onclick="location.hash='#/ordenes/${o.id}'" style="cursor:pointer">
                     <td><strong>#${o.id}</strong></td>
+                    <td>${escapeHtml(vehiculoLabel(o))}</td>
+                    <td>${escapeHtml(o.cliente_nombre || '—')}</td>
                     <td><span class="badge badge-${o.estado}">${o.estado}</span></td>
                     <td>${formatCurrency(o.total_con_descuento)}</td>
                     <td>${new Date(o.fecha_ingreso).toLocaleDateString('es-CO')}</td>
-                  </tr>`).join('') || '<tr><td colspan="4" style="text-align:center;color:var(--color-muted);padding:24px">Sin órdenes</td></tr>'}
+                  </tr>`).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--color-muted);padding:24px">Sin órdenes</td></tr>'}
               </tbody>
             </table>
           </div>

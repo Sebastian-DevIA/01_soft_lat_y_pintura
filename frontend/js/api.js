@@ -53,6 +53,8 @@ export const api = {
     list:   (params = '') => request('GET', `/api/v1/vehiculos/${params}`),
     get:    (id)  => request('GET', `/api/v1/vehiculos/${id}`),
     create: (data) => request('POST', '/api/v1/vehiculos/', data),
+    update: (id, data) => request('PUT', `/api/v1/vehiculos/${id}`, data),
+    delete: (id)  => request('DELETE', `/api/v1/vehiculos/${id}`),
   },
 
   // Órdenes
@@ -60,6 +62,7 @@ export const api = {
     list:      (params = '') => request('GET', `/api/v1/ordenes/${params}`),
     get:       (id)   => request('GET', `/api/v1/ordenes/${id}`),
     create:    (data)  => request('POST', '/api/v1/ordenes/', data),
+    cambiarEstado: (id, estado, notas = null) => request('PATCH', `/api/v1/ordenes/${id}/estado`, { estado, notas }),
     aprobar:   (id)   => request('PATCH', `/api/v1/ordenes/${id}/aprobar`),
     descuento: (id, pct) => request('PATCH', `/api/v1/ordenes/${id}/descuento`, { descuento_porcentaje: pct }),
     addItem:   (id, data) => request('POST', `/api/v1/ordenes/${id}/items`, data),
@@ -69,6 +72,7 @@ export const api = {
 
   // Facturas
   facturas: {
+    list:   (params = '') => request('GET', `/api/v1/facturas/${params}`),
     create: (data) => request('POST', '/api/v1/facturas/', data),
     get:    (id)   => request('GET', `/api/v1/facturas/${id}`),
     pdfUrl: (id)   => `${BASE_URL}/api/v1/facturas/${id}/pdf`,
@@ -76,6 +80,7 @@ export const api = {
 
   // Pagos
   pagos: {
+    list:        (params = '') => request('GET', `/api/v1/pagos/${params}`),
     create:      (data) => request('POST', '/api/v1/pagos/', data),
     byFactura:   (fid)  => request('GET', `/api/v1/pagos/factura/${fid}`),
   },

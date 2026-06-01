@@ -1,10 +1,31 @@
 import { api } from '../api.js';
-import { formatCurrency, formatDate, stateBadge, toast, renderLoader, renderError, showModal } from '../utils.js';
+import { formatCurrency, formatDate, stateBadge, toast, renderLoader, renderError, showModal, escapeHtml } from '../utils.js';
+
+// State machine (debe reflejar TRANSICIONES_VALIDAS del backend)
+const TRANSICIONES_VALIDAS = {
+  PERITAJE:   ['COTIZACION', 'CANCELADO'],
+  COTIZACION: ['APROBACION', 'CANCELADO'],
+  APROBACION: ['EN_PROCESO', 'CANCELADO'],
+  EN_PROCESO: ['ENTREGADO', 'CANCELADO'],
+  ENTREGADO:  [],
+  CANCELADO:  [],
+};
+
+// Etiqueta legible del vehículo a partir de campos enriquecidos (con fallback seguro).
+function vehiculoLabel(o) {
+  const placa = o.vehiculo_placa ? String(o.vehiculo_placa).trim() : '';
+  const desc = o.vehiculo_descripcion ? String(o.vehiculo_descripcion).trim() : '';
+  const principal = placa || desc;
+  if (!principal) return `Vehículo #${o.vehiculo_id}`;
+  return placa && desc ? `${placa} — ${desc}` : principal;
+}
 
 export const ordenes = {
   title: 'Órdenes de Trabajo',
   async render(container, ordenId) {
-    if (ordenId) {
+    if (ordenId === 'nueva') {
+      await renderNueva(container);
+    } else if (ordenId) {
       await renderDetalle(container, ordenId);
     } else {
       await renderLista(container);
@@ -31,7 +52,7 @@ async function renderLista(container) {
       <div class="card">
         <div class="table-wrapper">
           <table class="data-table">
-            <thead><tr><th>ID</th><th>Vehículo</th><th>Estado</th><th>Total</th><th>Ingreso</th><th></th></tr></thead>
+            <thead><tr><th>ID</th><th>Vehículo</th><th>Cliente</th><th>Estado</th><th>Total</th><th>Ingreso</th><th></th></tr></thead>
             <tbody id="tbody-ordenes">${renderFilasOrdenes(data)}</tbody>
           </table>
         </div>
@@ -48,11 +69,12 @@ async function renderLista(container) {
 }
 
 function renderFilasOrdenes(lista) {
-  if (!lista.length) return '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--color-muted)">Sin órdenes</td></tr>';
+  if (!lista.length) return '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--color-muted)">Sin órdenes</td></tr>';
   return lista.map(o => `
     <tr>
       <td><strong>#${o.id}</strong></td>
-      <td>Vehículo #${o.vehiculo_id}</td>
+      <td>${escapeHtml(vehiculoLabel(o))}</td>
+      <td>${escapeHtml(o.cliente_nombre || '—')}</td>
       <td>${stateBadge(o.estado)}</td>
       <td>${formatCurrency(o.total_con_descuento)}</td>
       <td>${formatDate(o.fecha_ingreso)}</td>
@@ -60,18 +82,275 @@ function renderFilasOrdenes(lista) {
     </tr>`).join('');
 }
 
+// ── Asistente: Nueva Orden ─────────────────────────────────────────────────
+async function renderNueva(container) {
+  // estado del asistente
+  const wiz = { cliente: null, vehiculo: null };
+  container.innerHTML = `
+    <div class="flex align-center gap-2 mb-2">
+      <a class="btn btn-outline btn-sm" href="#/ordenes">← Volver</a>
+      <h2>Nueva Orden</h2>
+    </div>
+    <div class="card">
+      <div id="wiz-pasos" class="flex gap-2 mb-2" style="font-size:.85rem;color:var(--color-muted)">
+        <span id="paso-lbl-1"><strong>1.</strong> Cliente</span>
+        <span>›</span>
+        <span id="paso-lbl-2"><strong>2.</strong> Vehículo</span>
+        <span>›</span>
+        <span id="paso-lbl-3"><strong>3.</strong> Orden</span>
+      </div>
+      <div id="wiz-body"></div>
+    </div>`;
+  const body = container.querySelector('#wiz-body');
+  renderPasoCliente(container, body, wiz);
+}
+
+function marcarPaso(container, n) {
+  for (let i = 1; i <= 3; i++) {
+    const el = container.querySelector(`#paso-lbl-${i}`);
+    if (el) el.style.color = i === n ? 'var(--color-primary)' : '';
+  }
+}
+
+// Paso 1: seleccionar/crear cliente
+function renderPasoCliente(container, body, wiz) {
+  marcarPaso(container, 1);
+  body.innerHTML = `
+    <h3 class="mb-2">Paso 1 — Selecciona el cliente</h3>
+    <div class="search-bar">
+      <input class="form-control" id="wiz-busqueda" placeholder="Buscar por nombre o cédula..." />
+      <button class="btn btn-outline" id="wiz-nuevo-cliente">+ Nuevo cliente</button>
+    </div>
+    <div class="table-wrapper">
+      <table class="data-table">
+        <thead><tr><th>Nombre</th><th>Cédula/RUC</th><th>Teléfono</th><th></th></tr></thead>
+        <tbody id="wiz-tbody-clientes"><tr><td colspan="4">${renderLoader('Cargando clientes…')}</td></tr></tbody>
+      </table>
+    </div>`;
+
+  const tbody = body.querySelector('#wiz-tbody-clientes');
+  const pintar = (lista) => {
+    if (!lista.length) {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--color-muted)">Sin clientes. Crea uno nuevo.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = lista.map(c => `
+      <tr>
+        <td><strong>${escapeHtml(c.nombre)} ${escapeHtml(c.apellido)}</strong></td>
+        <td>${escapeHtml(c.cedula_ruc)}</td>
+        <td>${escapeHtml(c.telefono)}</td>
+        <td><button class="btn btn-primary btn-sm wiz-sel-cliente" data-id="${c.id}">Seleccionar</button></td>
+      </tr>`).join('');
+    tbody.querySelectorAll('.wiz-sel-cliente').forEach(btn => {
+      btn.onclick = () => {
+        wiz.cliente = lista.find(c => String(c.id) === btn.dataset.id);
+        renderPasoVehiculo(container, body, wiz);
+      };
+    });
+  };
+
+  api.clientes.list().then(pintar).catch(err => {
+    tbody.innerHTML = `<tr><td colspan="4">${renderError(err.message)}</td></tr>`;
+  });
+
+  body.querySelector('#wiz-busqueda').oninput = async (e) => {
+    const q = e.target.value.trim();
+    try {
+      const res = await api.clientes.list(q ? `?busqueda=${encodeURIComponent(q)}` : '');
+      pintar(res);
+    } catch (err) { toast(err.message, 'error'); }
+  };
+
+  body.querySelector('#wiz-nuevo-cliente').onclick = () => {
+    showModal({
+      title: 'Nuevo Cliente',
+      body: `
+        <div class="form-group"><label>Nombre*</label><input class="form-control" id="c-nombre" /></div>
+        <div class="form-group"><label>Apellido*</label><input class="form-control" id="c-apellido" /></div>
+        <div class="form-group"><label>Cédula / RUC*</label><input class="form-control" id="c-cedula" /></div>
+        <div class="form-group"><label>Teléfono*</label><input class="form-control" id="c-telefono" /></div>
+        <div class="form-group"><label>Email</label><input class="form-control" id="c-email" /></div>
+        <div class="form-group"><label>Dirección</label><input class="form-control" id="c-direccion" /></div>`,
+      confirmText: 'Crear y continuar',
+      onConfirm: async (overlay) => {
+        const payload = {
+          nombre:     overlay.querySelector('#c-nombre').value.trim(),
+          apellido:   overlay.querySelector('#c-apellido').value.trim(),
+          cedula_ruc: overlay.querySelector('#c-cedula').value.trim(),
+          telefono:   overlay.querySelector('#c-telefono').value.trim(),
+          email:      overlay.querySelector('#c-email').value.trim() || null,
+          direccion:  overlay.querySelector('#c-direccion').value.trim() || null,
+        };
+        if (!payload.nombre || !payload.apellido || !payload.cedula_ruc || !payload.telefono) {
+          toast('Completa los campos obligatorios', 'error');
+          return false;
+        }
+        try {
+          wiz.cliente = await api.clientes.create(payload);
+          toast('Cliente creado', 'success');
+          renderPasoVehiculo(container, body, wiz);
+        } catch (err) { toast(err.message, 'error'); return false; }
+      }
+    });
+  };
+}
+
+// Paso 2: seleccionar/crear vehículo del cliente
+function renderPasoVehiculo(container, body, wiz) {
+  marcarPaso(container, 2);
+  const c = wiz.cliente;
+  body.innerHTML = `
+    <div class="flex justify-between align-center mb-2">
+      <h3>Paso 2 — Vehículo de ${escapeHtml(c.nombre)} ${escapeHtml(c.apellido)}</h3>
+      <button class="btn btn-outline btn-sm" id="wiz-volver-cliente">← Cambiar cliente</button>
+    </div>
+    <div class="flex justify-end mb-2">
+      <button class="btn btn-outline" id="wiz-nuevo-vehiculo">+ Nuevo vehículo</button>
+    </div>
+    <div class="table-wrapper">
+      <table class="data-table">
+        <thead><tr><th>Placa</th><th>Marca / Modelo</th><th>Año</th><th></th></tr></thead>
+        <tbody id="wiz-tbody-vehiculos"><tr><td colspan="4">${renderLoader('Cargando vehículos…')}</td></tr></tbody>
+      </table>
+    </div>`;
+
+  body.querySelector('#wiz-volver-cliente').onclick = () => renderPasoCliente(container, body, wiz);
+
+  const tbody = body.querySelector('#wiz-tbody-vehiculos');
+  const pintar = (lista) => {
+    if (!lista.length) {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--color-muted)">Este cliente no tiene vehículos. Registra uno.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = lista.map(v => `
+      <tr>
+        <td><strong>${escapeHtml(v.placa)}</strong></td>
+        <td>${escapeHtml(v.marca)} ${escapeHtml(v.modelo)}</td>
+        <td>${escapeHtml(v.anio ?? '—')}</td>
+        <td><button class="btn btn-primary btn-sm wiz-sel-veh" data-id="${v.id}">Seleccionar</button></td>
+      </tr>`).join('');
+    tbody.querySelectorAll('.wiz-sel-veh').forEach(btn => {
+      btn.onclick = () => {
+        wiz.vehiculo = lista.find(v => String(v.id) === btn.dataset.id);
+        renderPasoOrden(container, body, wiz);
+      };
+    });
+  };
+
+  api.vehiculos.list(`?cliente_id=${c.id}`).then(pintar).catch(err => {
+    tbody.innerHTML = `<tr><td colspan="4">${renderError(err.message)}</td></tr>`;
+  });
+
+  body.querySelector('#wiz-nuevo-vehiculo').onclick = () => mostrarFormularioVehiculo(c.id, null, async (nuevo) => {
+    wiz.vehiculo = nuevo;
+    renderPasoOrden(container, body, wiz);
+  });
+}
+
+// Paso 3: crear la orden
+function renderPasoOrden(container, body, wiz) {
+  marcarPaso(container, 3);
+  const v = wiz.vehiculo;
+  const c = wiz.cliente;
+  body.innerHTML = `
+    <div class="flex justify-between align-center mb-2">
+      <h3>Paso 3 — Datos de la orden</h3>
+      <button class="btn btn-outline btn-sm" id="wiz-volver-vehiculo">← Cambiar vehículo</button>
+    </div>
+    <div class="totales-box mb-2">
+      <div class="total-row"><span>Cliente</span><span>${escapeHtml(c.nombre)} ${escapeHtml(c.apellido)}</span></div>
+      <div class="total-row"><span>Vehículo</span><span>${escapeHtml(v.placa)} — ${escapeHtml(v.marca)} ${escapeHtml(v.modelo)}</span></div>
+    </div>
+    <div class="form-group"><label for="o-obs">Observaciones iniciales</label>
+      <textarea class="form-control" id="o-obs" rows="3" placeholder="Estado de ingreso, daños visibles, notas del peritaje..."></textarea>
+    </div>
+    <div class="flex justify-end gap-2 mt-2">
+      <button class="btn btn-primary" id="wiz-crear-orden">Crear orden</button>
+    </div>`;
+
+  body.querySelector('#wiz-volver-vehiculo').onclick = () => renderPasoVehiculo(container, body, wiz);
+
+  body.querySelector('#wiz-crear-orden').onclick = async (e) => {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    const payload = {
+      vehiculo_id:   v.id,
+      observaciones: body.querySelector('#o-obs').value.trim() || null,
+    };
+    try {
+      const nueva = await api.ordenes.create(payload);
+      toast('Orden creada', 'success');
+      location.hash = `#/ordenes/${nueva.id}`;
+    } catch (err) {
+      toast(err.message, 'error');
+      btn.disabled = false;
+    }
+  };
+}
+
+// Formulario de vehículo reutilizable (crear/editar). onDone recibe el vehículo resultante.
+function mostrarFormularioVehiculo(clienteId, vehiculo, onDone) {
+  showModal({
+    title: vehiculo ? 'Editar Vehículo' : 'Nuevo Vehículo',
+    body: `
+      <div class="form-group"><label>Placa*</label><input class="form-control" id="v-placa" value="${escapeHtml(vehiculo?.placa || '')}" /></div>
+      <div class="form-group"><label>Marca*</label><input class="form-control" id="v-marca" value="${escapeHtml(vehiculo?.marca || '')}" /></div>
+      <div class="form-group"><label>Modelo*</label><input class="form-control" id="v-modelo" value="${escapeHtml(vehiculo?.modelo || '')}" /></div>
+      <div class="form-group"><label>Año</label><input class="form-control" id="v-anio" type="number" min="1900" max="2100" value="${escapeHtml(vehiculo?.anio ?? '')}" /></div>
+      <div class="form-group"><label>Color</label><input class="form-control" id="v-color" value="${escapeHtml(vehiculo?.color || '')}" /></div>
+      <div class="form-group"><label>VIN</label><input class="form-control" id="v-vin" value="${escapeHtml(vehiculo?.vin || '')}" /></div>
+      <div class="form-group"><label>Kilometraje</label><input class="form-control" id="v-km" type="number" min="0" value="${escapeHtml(vehiculo?.kilometraje ?? '')}" /></div>`,
+    confirmText: vehiculo ? 'Guardar' : 'Crear y continuar',
+    onConfirm: async (overlay) => {
+      const anio = overlay.querySelector('#v-anio').value.trim();
+      const km = overlay.querySelector('#v-km').value.trim();
+      const payload = {
+        cliente_id:  clienteId,
+        placa:       overlay.querySelector('#v-placa').value.trim(),
+        marca:       overlay.querySelector('#v-marca').value.trim(),
+        modelo:      overlay.querySelector('#v-modelo').value.trim(),
+        anio:        anio ? parseInt(anio, 10) : null,
+        color:       overlay.querySelector('#v-color').value.trim() || null,
+        vin:         overlay.querySelector('#v-vin').value.trim() || null,
+        kilometraje: km ? parseInt(km, 10) : null,
+      };
+      if (!payload.placa || !payload.marca || !payload.modelo) {
+        toast('Placa, marca y modelo son obligatorios', 'error');
+        return false;
+      }
+      try {
+        const res = vehiculo
+          ? await api.vehiculos.update(vehiculo.id, payload)
+          : await api.vehiculos.create(payload);
+        toast(vehiculo ? 'Vehículo actualizado' : 'Vehículo registrado', 'success');
+        if (onDone) await onDone(res);
+      } catch (err) { toast(err.message, 'error'); return false; }
+    }
+  });
+}
+
+// ── Detalle de orden ───────────────────────────────────────────────────────
 async function renderDetalle(container, ordenId) {
   container.innerHTML = renderLoader();
   try {
     const orden = await api.ordenes.get(ordenId);
     const fases = await api.fases.byOrden(ordenId).catch(() => []);
 
+    const puedeCancelar = (TRANSICIONES_VALIDAS[orden.estado] || []).includes('CANCELADO');
+    const subtitulo = orden.vehiculo_placa
+      ? `<span class="text-muted">${escapeHtml(vehiculoLabel(orden))}${orden.cliente_nombre ? ' · ' + escapeHtml(orden.cliente_nombre) : ''}</span>`
+      : '';
+
     container.innerHTML = `
-      <div class="flex align-center gap-2 mb-2">
-        <a class="btn btn-outline btn-sm" href="#/ordenes">← Volver</a>
-        <h2>Orden #${orden.id}</h2>
-        ${stateBadge(orden.estado)}
+      <div class="flex justify-between align-center mb-2">
+        <div class="flex align-center gap-2">
+          <a class="btn btn-outline btn-sm" href="#/ordenes">← Volver</a>
+          <h2>Orden #${orden.id}</h2>
+          ${stateBadge(orden.estado)}
+        </div>
+        ${puedeCancelar ? '<button class="btn btn-danger btn-sm" id="btn-cancelar-orden">Cancelar orden</button>' : ''}
       </div>
+      ${subtitulo ? `<p class="mb-2">${subtitulo}</p>` : ''}
       <div class="tabs">
         <button class="tab-btn active" data-tab="peritaje">Peritaje</button>
         <button class="tab-btn" data-tab="cotizacion">Cotización</button>
@@ -94,9 +373,27 @@ async function renderDetalle(container, ordenId) {
       });
     });
 
+    // Cancelar orden
+    container.querySelector('#btn-cancelar-orden')?.addEventListener('click', async () => {
+      if (!confirm('¿Cancelar esta orden? Esta acción no se puede revertir.')) return;
+      try {
+        await api.ordenes.cambiarEstado(ordenId, 'CANCELADO');
+        toast('Orden cancelada', 'success');
+        renderDetalle(container, ordenId);
+      } catch (err) { toast(err.message, 'error'); }
+    });
+
     // Agregar ítem
     container.querySelector('#btn-agregar-item')?.addEventListener('click', () => {
-      mostrarFormularioItem(container, ordenId, orden);
+      mostrarFormularioItem(container, ordenId, null);
+    });
+
+    // Editar ítems
+    container.querySelectorAll('.btn-edit-item').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const item = orden.items.find(i => String(i.id) === btn.dataset.id);
+        mostrarFormularioItem(container, ordenId, item);
+      });
     });
 
     // Aprobar orden
@@ -107,6 +404,11 @@ async function renderDetalle(container, ordenId) {
         toast('Orden aprobada', 'success');
         renderDetalle(container, ordenId);
       } catch (err) { toast(err.message, 'error'); }
+    });
+
+    // Editar descuento
+    container.querySelector('#btn-editar-descuento')?.addEventListener('click', () => {
+      mostrarFormularioDescuento(container, ordenId, orden);
     });
 
     // Eliminar ítems
@@ -139,12 +441,15 @@ function renderTabPeritaje(orden) {
           <tbody>
             ${orden.items.length ? orden.items.map(i => `
               <tr>
-                <td><strong>${i.area_vehiculo}</strong></td>
-                <td>${i.descripcion}</td>
+                <td><strong>${escapeHtml(i.area_vehiculo)}</strong></td>
+                <td>${escapeHtml(i.descripcion)}</td>
                 <td class="text-right">${i.cantidad}</td>
                 <td class="text-right">${formatCurrency(i.precio_unitario)}</td>
                 <td class="text-right">${formatCurrency(i.subtotal)}</td>
-                ${puedeEditar ? `<td><button class="btn btn-danger btn-sm btn-delete-item" data-id="${i.id}">✕</button></td>` : ''}
+                ${puedeEditar ? `<td class="flex gap-1">
+                  <button class="btn btn-outline btn-sm btn-edit-item" data-id="${i.id}" aria-label="Editar ítem">✎</button>
+                  <button class="btn btn-danger btn-sm btn-delete-item" data-id="${i.id}" aria-label="Eliminar ítem">✕</button>
+                </td>` : ''}
               </tr>`).join('')
               : `<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--color-muted)">Sin ítems. Agregue las áreas a reparar.</td></tr>`}
           </tbody>
@@ -155,9 +460,13 @@ function renderTabPeritaje(orden) {
 
 function renderTabCotizacion(orden) {
   const puedeAprobar = orden.estado === 'COTIZACION' && orden.items.length > 0;
+  const puedeEditarDescuento = ['PERITAJE', 'COTIZACION'].includes(orden.estado);
   return `
     <div class="card">
-      <h3 class="mb-2">Resumen de Cotización</h3>
+      <div class="card-header">
+        <h3>Resumen de Cotización</h3>
+        ${puedeEditarDescuento ? '<button class="btn btn-outline btn-sm" id="btn-editar-descuento">Editar descuento</button>' : ''}
+      </div>
       <div class="totales-box">
         <div class="total-row"><span>Subtotal</span><span>${formatCurrency(orden.total_cotizado)}</span></div>
         <div class="total-row"><span>Descuento (${orden.descuento_porcentaje}%)</span><span>-${formatCurrency(orden.total_cotizado - orden.total_con_descuento)}</span></div>
@@ -179,10 +488,10 @@ function renderTabFases(fases) {
     ${fases.map(f => `
       <div style="margin-bottom:16px;padding:12px;border:1px solid var(--color-border);border-radius:var(--radius)">
         <div class="flex justify-between align-center">
-          <strong>${f.fase}</strong>
-          <span class="badge ${estadoColor[f.estado] || ''}">${f.estado}</span>
+          <strong>${escapeHtml(f.fase)}</strong>
+          <span class="badge ${estadoColor[f.estado] || ''}">${escapeHtml(f.estado)}</span>
         </div>
-        ${f.notas ? `<p class="text-muted mt-1" style="font-size:.85rem">${f.notas}</p>` : ''}
+        ${f.notas ? `<p class="text-muted mt-1" style="font-size:.85rem">${escapeHtml(f.notas)}</p>` : ''}
         <p class="text-muted mt-1" style="font-size:.78rem">Personal: ${f.asignaciones.length || 'Sin asignar'}</p>
       </div>`).join('')}
   </div>`;
@@ -211,8 +520,8 @@ async function cargarFactura(container, ordenId) {
       div.innerHTML = `
         <div class="card">
           <div class="card-header">
-            <h3>Factura ${f.numero_factura}</h3>
-            <span class="badge badge-${f.estado}">${f.estado}</span>
+            <h3>Factura ${escapeHtml(f.numero_factura)}</h3>
+            <span class="badge badge-${f.estado}">${escapeHtml(f.estado)}</span>
           </div>
           <div class="totales-box">
             <div class="total-row"><span>Total</span><span>${formatCurrency(f.monto_total)}</span></div>
@@ -235,15 +544,16 @@ async function cargarFactura(container, ordenId) {
   } catch (err) { div.innerHTML = renderError(err.message); }
 }
 
-function mostrarFormularioItem(container, ordenId, orden) {
+// Crear/editar ítem de peritaje. Si `item` viene, es edición.
+function mostrarFormularioItem(container, ordenId, item) {
   showModal({
-    title: 'Agregar Área Dañada',
+    title: item ? 'Editar Área Dañada' : 'Agregar Área Dañada',
     body: `
-      <div class="form-group"><label>Área del vehículo*</label><input class="form-control" id="f-area" placeholder="Ej: Puerta trasera izquierda" /></div>
-      <div class="form-group"><label>Descripción*</label><input class="form-control" id="f-desc" placeholder="Ej: Abolladuras profundas y rayones" /></div>
-      <div class="form-group"><label>Precio unitario (COP)*</label><input class="form-control" id="f-precio" type="number" min="1" /></div>
-      <div class="form-group"><label>Cantidad</label><input class="form-control" id="f-cant" type="number" value="1" min="1" /></div>`,
-    confirmText: 'Agregar',
+      <div class="form-group"><label>Área del vehículo*</label><input class="form-control" id="f-area" value="${escapeHtml(item?.area_vehiculo || '')}" placeholder="Ej: Puerta trasera izquierda" /></div>
+      <div class="form-group"><label>Descripción*</label><input class="form-control" id="f-desc" value="${escapeHtml(item?.descripcion || '')}" placeholder="Ej: Abolladuras profundas y rayones" /></div>
+      <div class="form-group"><label>Precio unitario (COP)*</label><input class="form-control" id="f-precio" type="number" min="1" value="${escapeHtml(item?.precio_unitario ?? '')}" /></div>
+      <div class="form-group"><label>Cantidad</label><input class="form-control" id="f-cant" type="number" value="${escapeHtml(item?.cantidad ?? 1)}" min="1" /></div>`,
+    confirmText: item ? 'Guardar' : 'Agregar',
     onConfirm: async (overlay) => {
       const payload = {
         area_vehiculo:   overlay.querySelector('#f-area').value.trim(),
@@ -251,11 +561,44 @@ function mostrarFormularioItem(container, ordenId, orden) {
         precio_unitario: parseFloat(overlay.querySelector('#f-precio').value),
         cantidad:        parseInt(overlay.querySelector('#f-cant').value),
       };
+      if (!payload.area_vehiculo || !payload.descripcion || !(payload.precio_unitario > 0) || !(payload.cantidad >= 1)) {
+        toast('Revisa los campos: área, descripción, precio > 0 y cantidad ≥ 1', 'error');
+        return false;
+      }
       try {
-        await api.ordenes.addItem(ordenId, payload);
-        toast('Área agregada', 'success');
+        if (item) {
+          await api.ordenes.updateItem(ordenId, item.id, payload);
+          toast('Ítem actualizado', 'success');
+        } else {
+          await api.ordenes.addItem(ordenId, payload);
+          toast('Área agregada', 'success');
+        }
         renderDetalle(container, ordenId);
-      } catch (err) { toast(err.message, 'error'); }
+      } catch (err) { toast(err.message, 'error'); return false; }
+    }
+  });
+}
+
+function mostrarFormularioDescuento(container, ordenId, orden) {
+  showModal({
+    title: 'Editar Descuento',
+    body: `
+      <p class="mb-2 text-muted">Se aplica sobre el subtotal de la cotización.</p>
+      <div class="form-group"><label>Descuento (%)*</label>
+        <input class="form-control" id="f-pct" type="number" min="0" max="100" step="0.1" value="${escapeHtml(orden.descuento_porcentaje ?? 0)}" />
+      </div>`,
+    confirmText: 'Aplicar',
+    onConfirm: async (overlay) => {
+      const pct = parseFloat(overlay.querySelector('#f-pct').value);
+      if (!(pct >= 0 && pct <= 100)) {
+        toast('El descuento debe estar entre 0 y 100', 'error');
+        return false;
+      }
+      try {
+        await api.ordenes.descuento(ordenId, pct);
+        toast('Descuento aplicado', 'success');
+        renderDetalle(container, ordenId);
+      } catch (err) { toast(err.message, 'error'); return false; }
     }
   });
 }

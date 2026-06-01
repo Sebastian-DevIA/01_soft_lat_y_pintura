@@ -1,5 +1,5 @@
 import { api } from '../api.js';
-import { toast, renderLoader, renderError, showModal } from '../utils.js';
+import { toast, renderLoader, renderError, showModal, escapeHtml } from '../utils.js';
 
 const ROLES = ['LATONERO', 'PINTOR', 'PULIDOR', 'AUXILIAR', 'JEFE_TALLER', 'RECEPCIONISTA'];
 
@@ -21,11 +21,12 @@ export const personal = {
               <tbody>
                 ${data.map(p => `
                   <tr>
-                    <td><strong>${p.nombre} ${p.apellido}</strong></td>
-                    <td>${p.rol}</td>
-                    <td>${p.telefono || '—'}</td>
+                    <td><strong>${escapeHtml(p.nombre)} ${escapeHtml(p.apellido)}</strong></td>
+                    <td>${escapeHtml(p.rol)}</td>
+                    <td>${escapeHtml(p.telefono || '—')}</td>
                     <td><span class="badge ${p.activo ? 'badge-EN_PROCESO' : 'badge-CANCELADO'}">${p.activo ? 'Activo' : 'Inactivo'}</span></td>
-                    <td>
+                    <td class="flex gap-1">
+                      <button class="btn btn-outline btn-sm" data-id="${p.id}" data-action="editar">Editar</button>
                       <button class="btn btn-outline btn-sm" data-id="${p.id}" data-action="toggle">
                         ${p.activo ? 'Desactivar' : 'Activar'}
                       </button>
@@ -36,7 +37,15 @@ export const personal = {
           </div>
         </div>`;
 
-      container.querySelector('#btn-nuevo').onclick = () => mostrarFormulario(container);
+      container.querySelector('#btn-nuevo').onclick = () => mostrarFormulario(container, null);
+
+      container.querySelectorAll('[data-action="editar"]').forEach(btn => {
+        btn.onclick = () => {
+          const emp = data.find(p => String(p.id) === btn.dataset.id);
+          mostrarFormulario(container, emp);
+        };
+      });
+
       container.querySelectorAll('[data-action="toggle"]').forEach(btn => {
         btn.onclick = async () => {
           try {
@@ -52,16 +61,20 @@ export const personal = {
   }
 };
 
-function mostrarFormulario(container) {
+// Crear/editar empleado. Si `empleado` viene, es edición.
+function mostrarFormulario(container, empleado) {
+  const opcionesRol = ROLES
+    .map(r => `<option ${empleado?.rol === r ? 'selected' : ''}>${r}</option>`)
+    .join('');
   showModal({
-    title: 'Nuevo Empleado',
+    title: empleado ? 'Editar Empleado' : 'Nuevo Empleado',
     body: `
-      <div class="form-group"><label>Nombre*</label><input class="form-control" id="f-nombre" /></div>
-      <div class="form-group"><label>Apellido*</label><input class="form-control" id="f-apellido" /></div>
+      <div class="form-group"><label>Nombre*</label><input class="form-control" id="f-nombre" value="${escapeHtml(empleado?.nombre || '')}" /></div>
+      <div class="form-group"><label>Apellido*</label><input class="form-control" id="f-apellido" value="${escapeHtml(empleado?.apellido || '')}" /></div>
       <div class="form-group"><label>Rol*</label>
-        <select class="form-control" id="f-rol">${ROLES.map(r => `<option>${r}</option>`).join('')}</select>
+        <select class="form-control" id="f-rol">${opcionesRol}</select>
       </div>
-      <div class="form-group"><label>Teléfono</label><input class="form-control" id="f-tel" /></div>`,
+      <div class="form-group"><label>Teléfono</label><input class="form-control" id="f-tel" value="${escapeHtml(empleado?.telefono || '')}" /></div>`,
     confirmText: 'Guardar',
     onConfirm: async (overlay) => {
       const payload = {
@@ -70,11 +83,20 @@ function mostrarFormulario(container) {
         rol:      overlay.querySelector('#f-rol').value,
         telefono: overlay.querySelector('#f-tel').value.trim() || null,
       };
+      if (!payload.nombre || !payload.apellido) {
+        toast('Nombre y apellido son obligatorios', 'error');
+        return false;
+      }
       try {
-        await api.personal.create(payload);
-        toast('Empleado registrado', 'success');
+        if (empleado) {
+          await api.personal.update(empleado.id, payload);
+          toast('Empleado actualizado', 'success');
+        } else {
+          await api.personal.create(payload);
+          toast('Empleado registrado', 'success');
+        }
         personal.render(container);
-      } catch (err) { toast(err.message, 'error'); }
+      } catch (err) { toast(err.message, 'error'); return false; }
     }
   });
 }
