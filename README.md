@@ -148,6 +148,7 @@ PERITAJE → COTIZACION → APROBACION → EN_PROCESO → ENTREGADO
 | GET    | `/api/v1/clientes/{id}`           | Obtener cliente                    |
 | PUT    | `/api/v1/clientes/{id}`           | Actualizar cliente                 |
 | DELETE | `/api/v1/clientes/{id}`           | Desactivar cliente (soft-delete)   |
+| PATCH  | `/api/v1/clientes/{id}/activar`   | Reactivar / alternar cliente       |
 | GET    | `/api/v1/vehiculos/`              | Listar vehículos (placa/cliente/activo) |
 | POST   | `/api/v1/vehiculos/`              | Crear vehículo                     |
 | GET    | `/api/v1/vehiculos/{id}`          | Obtener vehículo                   |
@@ -219,6 +220,32 @@ proyecto es Vanilla por diseño).
 
 ---
 
+## Funcionalidades destacadas
+
+### Gestión de clientes (CRUD completo)
+- Crear, ver, **editar**, **eliminar** (soft-delete) y **reactivar** clientes desde la lista.
+- Filtro **Activos / Inactivos** y búsqueda por nombre/cédula.
+- Confirmaciones con modal de vidrio (no diálogos nativos), validación de campos y estados de carga/vacío/error.
+- Ficha de cliente con sus **vehículos** (CRUD anidado).
+
+### Facturación y PDF
+- Emisión de factura (adelanto 50%) y registro de pagos.
+- **Visor de PDF integrado**: ver, descargar e imprimir. La descarga es **autenticada por
+  JWT** (`fetch` → `Blob` → object URL), por eso funciona aunque el endpoint exija token.
+- **Desglose de IVA** en el PDF (base gravable + IVA), tasa configurable (`IVA_PORCENTAJE`).
+- **Enviar al cliente**: botón que comparte un resumen de la factura por WhatsApp
+  (`wa.me`), sin necesidad de servidor de correo.
+
+### Mapa de daños del vehículo (SVG interactivo)
+- Componente `frontend/js/components/CarDiagram.js`: vista superior de un carro con
+  zonas clicables (capó, techo, baúl, 4 puertas, 4 guardabarros, 2 paragolpes), cada una
+  con su **nombre**. Accesible (teclado, `role`/`aria-label`).
+- En el **peritaje**, al registrar un área dañada se selecciona la zona en el diagrama
+  (rellena el campo `area_vehiculo`); también se puede escribir libremente otra parte.
+- En la vista de la orden, las zonas con daño registrado se resaltan en rojo (solo lectura).
+
+---
+
 ## Cómo correr el proyecto
 
 ```bash
@@ -248,7 +275,10 @@ python backend/scripts/seed_db.py
 uvicorn app.main:app --reload --app-dir backend
 
 # 8. Servir el frontend (en otra terminal) — NO lo abras como archivo file://
-#    porque el navegador bloquea las llamadas por CORS. Sírvelo por HTTP:
+#    porque el navegador bloquea las llamadas por CORS. Sírvelo por HTTP.
+#    Recomendado en desarrollo (sin caché, evita módulos JS viejos):
+python scripts/dev_frontend.py
+#    Alternativa simple:
 python -m http.server 8080 --directory frontend
 ```
 
@@ -276,6 +306,7 @@ python -m http.server 8080 --directory frontend
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | Duración del token                   | `480`                           |
 | `DEBUG`                       | Activa `/docs` y `/redoc`            | `false`                         |
 | `ALLOWED_ORIGINS`             | CORS (separados por coma)            | `http://localhost:8000`         |
+| `IVA_PORCENTAJE`              | % de IVA mostrado en el PDF (display)| `19.0`                          |
 
 ---
 

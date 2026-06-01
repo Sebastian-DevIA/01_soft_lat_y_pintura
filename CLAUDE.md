@@ -88,6 +88,28 @@ Validación vive en `backend/app/services/orden_service.py`.
 
 ## Estado actual / cambios recientes
 
+**Iteración "mejoras profesionales" (clientes / facturas / partes del carro / UI):**
+- **Clientes**: `PATCH /clientes/{id}/activar` (reactivar/alternar tras soft-delete) y
+  `PUT /clientes/{id}` devuelve **409** si la `cedula_ruc` ya existe en otro cliente.
+  La UI (`clientes.js`) tiene CRUD completo en la lista (editar/eliminar/reactivar),
+  filtro Activos/Inactivos y formulario unificado con validación.
+- **Factura/PDF**: el visor del PDF en el front usa `api.facturas.pdfBlob()`
+  (`fetch` con JWT → `Blob` → object URL); un `<a href>` plano daba **401** porque el
+  navegador no manda el header. Helpers nuevos en `utils.js`: `showPdfViewer`,
+  `confirmDialog`. La plantilla del PDF muestra **desglose de IVA** (display-only,
+  no toca `monto_total` ni el 50%); tasa en `Settings.iva_porcentaje` (default 19) y
+  `pdf_service` la calcula con `round()`. **Jinja con `autoescape`** (datos de cliente).
+  Botón "Enviar al cliente" comparte resumen por WhatsApp (`wa.me`).
+- **Partes del carro**: `frontend/js/components/CarDiagram.js` — SVG 2D (vista superior,
+  carro normal/sedán) con 13 zonas nombradas y clicables; integrado en el form de ítem
+  de peritaje (rellena `area_vehiculo`; el texto libre sigue disponible para otras partes)
+  y como mapa de daños solo-lectura en la orden. Reutilizar `createCarDiagram(...)`.
+- **Auth**: `isAuthenticated()` (`auth.js`) valida la **expiración** del JWT (lee `exp`)
+  para no dejar "entrar" con un token viejo y rebotar con 401.
+- **Dev**: `scripts/dev_frontend.py` sirve el frontend **sin caché** (evita módulos JS
+  viejos). `frontend/_boot.html` está en `.gitignore` (página puente solo para screenshots).
+- Confirmaciones migradas de `confirm()` nativo a `confirmDialog` (clientes/ordenes/seguimiento).
+
 **Esquema:**
 - `Vehiculo` tiene flag `activo` (bool, default True) — mismo patrón que `Cliente`/`Personal`.
   Lo agrega la migración `0002_vehiculo_activo`. `DELETE /vehiculos/{id}` es soft-delete
@@ -270,8 +292,14 @@ black backend/app/
 > ```bash
 > # backend (API) + frontend (UI), desde la raíz del repo en WSL
 > python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --app-dir backend &
-> python3 -m http.server 8080 --directory frontend &
+> python3 scripts/dev_frontend.py &   # frontend SIN caché (evita módulos JS viejos)
 > ```
+>
+> **Nota WSL+Windows:** al lanzar por `wsl.exe -- bash -lc "...$VAR..."`, las variables
+> de shell se pierden por el anidamiento de comillas. Usa **rutas literales** (no `$VAR`)
+> o un **script** (`bash script.sh`, normalizado a LF). Para `uvicorn` usa `cd <raíz> &&`
+> (la `DATABASE_URL` es relativa) o `--app-dir backend`; **no** uses `--reload` en ese
+> contexto (el reloader pierde el `--app-dir`).
 >
 > | Recurso | URL / Valor |
 > |---------|-------------|
