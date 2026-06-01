@@ -246,6 +246,18 @@ proyecto es Vanilla por diseño).
 
 ---
 
+## Pendientes (roadmap)
+
+Mejoras anotadas para una próxima iteración (**aún no implementadas**):
+
+| # | Pendiente | Descripción |
+|---|-----------|-------------|
+| 1 | Mejorar el **CRUD de órdenes** | Llevar el alta/edición/eliminación de órdenes al mismo nivel del CRUD de clientes (validación, estados de carga/vacío/error y confirmaciones con modal). |
+| 2 | Mapa de daños en **horizontal** | El diagrama del vehículo está en vertical; dejarlo en **orientación horizontal** (vista superior apaisada). |
+| 3 | Áreas dañadas **junto al mapa** | Mostrar la visualización de las zonas dañadas **al lado** del diagrama del carro (dos columnas) para que sea más visible. |
+
+---
+
 ## Cómo correr el proyecto
 
 ```bash
