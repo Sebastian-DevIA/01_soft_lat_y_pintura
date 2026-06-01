@@ -16,6 +16,10 @@ class Settings(BaseSettings):
 
     allowed_origins: str = "http://localhost:8000,http://127.0.0.1:8000"
 
+    # IVA aplicado en la factura (Colombia = 19%). Se asume que los precios de los
+    # ítems YA incluyen IVA; en el PDF se muestra el desglose (base gravable + IVA).
+    iva_porcentaje: float = 19.0
+
     @property
     def origins_list(self) -> list[str]:
         return [o.strip() for o in self.allowed_origins.split(",")]

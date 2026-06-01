@@ -112,8 +112,16 @@
         <td class="text-right">-${{ "%.2f"|format(orden.total_cotizado - factura.monto_total) }}</td>
       </tr>
       {% endif %}
+      <tr>
+        <td>Base gravable</td>
+        <td class="text-right">${{ "%.2f"|format(base_gravable) }}</td>
+      </tr>
+      <tr>
+        <td>IVA ({{ "%g"|format(iva_tasa) }}%)</td>
+        <td class="text-right">${{ "%.2f"|format(monto_iva) }}</td>
+      </tr>
       <tr class="total-final">
-        <td>TOTAL</td>
+        <td>TOTAL (IVA incl.)</td>
         <td class="text-right">${{ "%.2f"|format(factura.monto_total) }}</td>
       </tr>
       <tr>

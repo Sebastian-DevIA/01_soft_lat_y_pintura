@@ -89,3 +89,23 @@ def test_listar_facturas_filtro_estado(client, auth_headers, orden_aprobada):
     resp = client.get("/api/v1/facturas/?estado=PENDIENTE", headers=auth_headers)
     assert resp.status_code == 200
     assert all(f["estado"] == "PENDIENTE" for f in resp.json())
+
+
+def test_pdf_requiere_autenticacion(client, auth_headers, orden_aprobada):
+    f = client.post(
+        "/api/v1/facturas/", json={"orden_id": orden_aprobada["id"]}, headers=auth_headers
+    ).json()
+    # Sin token → 401 (este es el motivo por el que un <a href> plano no podía verlo)
+    resp = client.get(f"/api/v1/facturas/{f['id']}/pdf")
+    assert resp.status_code == 401
+
+
+def test_descargar_pdf_factura(client, auth_headers, orden_aprobada):
+    f = client.post(
+        "/api/v1/facturas/", json={"orden_id": orden_aprobada["id"]}, headers=auth_headers
+    ).json()
+    resp = client.get(f"/api/v1/facturas/{f['id']}/pdf", headers=auth_headers)
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/pdf"
+    # Cuerpo es un PDF real (valida que la plantilla con el desglose de IVA renderiza)
+    assert resp.content[:5] == b"%PDF-"

@@ -77,6 +77,18 @@ def actualizar_cliente(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Cliente no encontrado"
         )
+    # cedula_ruc es unique: si cambia a una ya usada por otro cliente, evitar el 500.
+    if data.cedula_ruc != cliente.cedula_ruc:
+        conflicto = (
+            db.query(Cliente)
+            .filter(Cliente.cedula_ruc == data.cedula_ruc, Cliente.id != cliente_id)
+            .first()
+        )
+        if conflicto:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Ya existe un cliente con cédula/RUC {data.cedula_ruc}",
+            )
     for campo, valor in data.model_dump().items():
         setattr(cliente, campo, valor)
     db.commit()
@@ -97,3 +109,21 @@ def desactivar_cliente(
         )
     cliente.activo = False
     db.commit()
+
+
+@router.patch("/{cliente_id}/activar", response_model=ClienteResponse)
+def toggle_activo(
+    cliente_id: int,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(get_current_user),
+):
+    """Alterna el estado activo/inactivo del cliente (permite reactivar tras soft-delete)."""
+    cliente = db.query(Cliente).filter(Cliente.id == cliente_id).first()
+    if not cliente:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Cliente no encontrado"
+        )
+    cliente.activo = not cliente.activo
+    db.commit()
+    db.refresh(cliente)
+    return cliente

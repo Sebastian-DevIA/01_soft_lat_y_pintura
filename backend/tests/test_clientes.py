@@ -44,3 +44,60 @@ def test_desactivar_cliente(client, auth_headers):
     created = client.post("/api/v1/clientes/", json=CLIENTE_DATA, headers=auth_headers).json()
     resp = client.delete(f"/api/v1/clientes/{created['id']}", headers=auth_headers)
     assert resp.status_code == 204
+
+
+def test_actualizar_cliente(client, auth_headers):
+    created = client.post("/api/v1/clientes/", json=CLIENTE_DATA, headers=auth_headers).json()
+    cambios = {**CLIENTE_DATA, "telefono": "3009999999", "direccion": "Calle 1"}
+    resp = client.put(
+        f"/api/v1/clientes/{created['id']}", json=cambios, headers=auth_headers
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["telefono"] == "3009999999"
+    assert data["direccion"] == "Calle 1"
+
+
+def test_actualizar_cliente_cedula_duplicada(client, auth_headers):
+    # Dos clientes; intentar darle al segundo la cédula del primero → 409
+    c1 = client.post("/api/v1/clientes/", json=CLIENTE_DATA, headers=auth_headers).json()
+    otro = {**CLIENTE_DATA, "cedula_ruc": "9999999999"}
+    c2 = client.post("/api/v1/clientes/", json=otro, headers=auth_headers).json()
+    resp = client.put(
+        f"/api/v1/clientes/{c2['id']}",
+        json={**otro, "cedula_ruc": c1["cedula_ruc"]},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 409
+
+
+def test_actualizar_cliente_misma_cedula_ok(client, auth_headers):
+    # Actualizar otros campos sin cambiar la propia cédula NO debe dar 409
+    created = client.post("/api/v1/clientes/", json=CLIENTE_DATA, headers=auth_headers).json()
+    resp = client.put(
+        f"/api/v1/clientes/{created['id']}",
+        json={**CLIENTE_DATA, "nombre": "Juan Carlos"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    assert resp.json()["nombre"] == "Juan Carlos"
+
+
+def test_toggle_reactivar_cliente(client, auth_headers):
+    created = client.post("/api/v1/clientes/", json=CLIENTE_DATA, headers=auth_headers).json()
+    client.delete(f"/api/v1/clientes/{created['id']}", headers=auth_headers)  # activo=False
+    resp = client.patch(
+        f"/api/v1/clientes/{created['id']}/activar", headers=auth_headers
+    )
+    assert resp.status_code == 200
+    assert resp.json()["activo"] is True
+    # Vuelve a alternar → inactivo
+    resp2 = client.patch(
+        f"/api/v1/clientes/{created['id']}/activar", headers=auth_headers
+    )
+    assert resp2.json()["activo"] is False
+
+
+def test_toggle_cliente_inexistente(client, auth_headers):
+    resp = client.patch("/api/v1/clientes/9999/activar", headers=auth_headers)
+    assert resp.status_code == 404
