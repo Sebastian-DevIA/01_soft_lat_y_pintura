@@ -135,6 +135,18 @@ La state machine se opera por UI vía `PATCH /ordenes/{id}/estado` (incluye CANC
 
 ---
 
+## Pendientes (próxima iteración)
+
+Tareas anotadas para continuar más tarde. **No están implementadas todavía.**
+
+| # | Pendiente | Detalle | Dónde |
+|---|-----------|---------|-------|
+| 1 | Mejorar el **CRUD de órdenes** | Pulir alta/edición/eliminación de órdenes al nivel del CRUD de clientes (validación, estados de carga/vacío/error, confirmaciones con `confirmDialog`). | `frontend/js/pages/ordenes.js` |
+| 2 | Mapa de daños en **horizontal** | El `CarDiagram` está en orientación vertical; debe quedar **horizontal** (vista superior apaisada). | `frontend/js/components/CarDiagram.js`, `frontend/css/components.css` |
+| 3 | Áreas dañadas **al lado** del mapa | Mostrar la lista/visualización de zonas dañadas **junto** al diagrama del carro (layout en dos columnas) para que sea más visible. | `frontend/js/pages/ordenes.js`, `frontend/css/components.css` |
+
+---
+
 ## Estructura de archivos
 
 ```
