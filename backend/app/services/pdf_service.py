@@ -1,5 +1,5 @@
 import os
-from jinja2 import Environment, FileSystemLoader
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 from weasyprint import HTML
 
 from app.config import settings
@@ -8,7 +8,12 @@ TEMPLATES_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "templates"
 )
 
-_jinja_env = Environment(loader=FileSystemLoader(TEMPLATES_DIR))
+# autoescape ON: los datos del cliente (nombre, dirección, ítems) van al HTML del
+# PDF; sin autoescape un valor con `<` permitiría inyección/deformación del documento.
+_jinja_env = Environment(
+    loader=FileSystemLoader(TEMPLATES_DIR),
+    autoescape=select_autoescape(["html"]),
+)
 
 
 def generar_pdf_factura(factura) -> bytes:

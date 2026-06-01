@@ -12,7 +12,8 @@ export function formatDate(iso) {
 
 // ── Badge de estado ──────────────────────────────────────────────────────
 export function stateBadge(estado) {
-  return `<span class="badge badge-${estado}">${estado.replace('_', ' ')}</span>`;
+  const e = escapeHtml(estado);
+  return `<span class="badge badge-${e}">${e.replace('_', ' ')}</span>`;
 }
 
 // ── Toast ────────────────────────────────────────────────────────────────
