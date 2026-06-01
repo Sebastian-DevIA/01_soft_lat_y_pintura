@@ -14,29 +14,26 @@
 // en `item.area_vehiculo`. El `id` del path es solo estado interno del componente.
 import { escapeHtml } from '../utils.js';
 
-// Definición de zonas: id interno, etiqueta legible (lo que se persiste) y rect.
+// Zonas de un carro normal (sedán), vista superior. Cada zona lleva:
+//  - label: nombre completo legible (lo que se guarda en area_vehiculo y va en aria-label)
+//  - short: texto que se DIBUJA sobre la zona (todas lo tienen)
+//  - vertical: true si el texto se rota 90° (zonas laterales angostas)
+// El conjunto cubre las partes más comunes; agregar otras es OPCIONAL vía el campo de texto.
 const ZONES = [
-  { id: 'paragolpes-del', label: 'Paragolpes delantero',            x: 80,  y: 22,  w: 160, h: 34, rx: 16 },
-  { id: 'aleta-del-izq',  label: 'Guardabarros delantero izquierdo', x: 74,  y: 64,  w: 40,  h: 88, rx: 8 },
-  { id: 'capo',           label: 'Capó',                            x: 120, y: 64,  w: 80,  h: 88, rx: 8 },
-  { id: 'aleta-del-der',  label: 'Guardabarros delantero derecho',   x: 206, y: 64,  w: 40,  h: 88, rx: 8 },
-  { id: 'puerta-del-izq', label: 'Puerta delantera izquierda',       x: 74,  y: 160, w: 40,  h: 96, rx: 6 },
-  { id: 'techo',          label: 'Techo',                           x: 120, y: 160, w: 80,  h: 200, rx: 10 },
-  { id: 'puerta-del-der', label: 'Puerta delantera derecha',         x: 206, y: 160, w: 40,  h: 96, rx: 6 },
-  { id: 'puerta-tra-izq', label: 'Puerta trasera izquierda',         x: 74,  y: 262, w: 40,  h: 96, rx: 6 },
-  { id: 'puerta-tra-der', label: 'Puerta trasera derecha',           x: 206, y: 262, w: 40,  h: 96, rx: 6 },
-  { id: 'aleta-tra-izq',  label: 'Guardabarros trasero izquierdo',   x: 74,  y: 366, w: 40,  h: 88, rx: 8 },
-  { id: 'baul',           label: 'Baúl / Maletero',                 x: 120, y: 366, w: 80,  h: 88, rx: 8 },
-  { id: 'aleta-tra-der',  label: 'Guardabarros trasero derecho',     x: 206, y: 366, w: 40,  h: 88, rx: 8 },
-  { id: 'paragolpes-tra', label: 'Paragolpes trasero',              x: 80,  y: 462, w: 160, h: 34, rx: 16 },
+  { id: 'paragolpes-del', label: 'Paragolpes delantero',             short: 'Paragolpes del.', x: 80,  y: 22,  w: 160, h: 34, rx: 16 },
+  { id: 'aleta-del-izq',  label: 'Guardabarros delantero izquierdo', short: 'Aleta del. izq.', x: 74,  y: 64,  w: 40,  h: 88, rx: 8, vertical: true },
+  { id: 'capo',           label: 'Capó',                             short: 'Capó',            x: 120, y: 64,  w: 80,  h: 88, rx: 8 },
+  { id: 'aleta-del-der',  label: 'Guardabarros delantero derecho',   short: 'Aleta del. der.', x: 206, y: 64,  w: 40,  h: 88, rx: 8, vertical: true },
+  { id: 'puerta-del-izq', label: 'Puerta delantera izquierda',       short: 'Puerta del. izq.', x: 74,  y: 160, w: 40,  h: 96, rx: 6, vertical: true },
+  { id: 'techo',          label: 'Techo',                            short: 'Techo',           x: 120, y: 160, w: 80,  h: 200, rx: 10 },
+  { id: 'puerta-del-der', label: 'Puerta delantera derecha',         short: 'Puerta del. der.', x: 206, y: 160, w: 40,  h: 96, rx: 6, vertical: true },
+  { id: 'puerta-tra-izq', label: 'Puerta trasera izquierda',         short: 'Puerta tras. izq.', x: 74,  y: 262, w: 40,  h: 96, rx: 6, vertical: true },
+  { id: 'puerta-tra-der', label: 'Puerta trasera derecha',           short: 'Puerta tras. der.', x: 206, y: 262, w: 40,  h: 96, rx: 6, vertical: true },
+  { id: 'aleta-tra-izq',  label: 'Guardabarros trasero izquierdo',   short: 'Aleta tras. izq.', x: 74,  y: 366, w: 40,  h: 88, rx: 8, vertical: true },
+  { id: 'baul',           label: 'Baúl / Maletero',                  short: 'Baúl',            x: 120, y: 366, w: 80,  h: 88, rx: 8 },
+  { id: 'aleta-tra-der',  label: 'Guardabarros trasero derecho',     short: 'Aleta tras. der.', x: 206, y: 366, w: 40,  h: 88, rx: 8, vertical: true },
+  { id: 'paragolpes-tra', label: 'Paragolpes trasero',               short: 'Paragolpes tras.', x: 80,  y: 462, w: 160, h: 34, rx: 16 },
 ];
-
-// Etiquetas visibles solo en las zonas grandes (las demás usan tooltip + aria-label).
-const VISIBLE_LABELS = {
-  capo: 'Capó',
-  techo: 'Techo',
-  baul: 'Baúl',
-};
 
 const norm = (s) => (s || '').toString().trim().toLowerCase();
 
@@ -52,9 +49,9 @@ export function createCarDiagram({ selected = null, damagedZones = [], readonly 
     const isSelected = norm(z.label) === norm(selectedLabel);
     const cls = ['car-zone', isDamaged ? 'damaged' : '', isSelected ? 'selected' : ''].filter(Boolean).join(' ');
     const cx = z.x + z.w / 2;
-    const cy = z.y + z.h / 2 + 4;
-    const visible = VISIBLE_LABELS[z.id];
+    const cy = z.y + z.h / 2;
     const label = `${z.label}${isDamaged ? ' (con daño registrado)' : ''}`;
+    const rot = z.vertical ? ` transform="rotate(-90 ${cx} ${cy})"` : '';
     return `
       <g>
         <rect class="${cls}" data-zone="${escapeHtml(z.label)}" data-id="${z.id}"
@@ -62,7 +59,7 @@ export function createCarDiagram({ selected = null, damagedZones = [], readonly 
               ${readonly ? '' : 'tabindex="0" role="button"'} aria-label="${escapeHtml(label)}">
           <title>${escapeHtml(label)}</title>
         </rect>
-        ${visible ? `<text class="car-zone-label" x="${cx}" y="${cy}">${escapeHtml(visible)}</text>` : ''}
+        <text class="car-zone-label" x="${cx}" y="${cy + 3}"${rot}>${escapeHtml(z.short)}</text>
       </g>`;
   }).join('');
 

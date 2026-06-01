@@ -440,8 +440,10 @@ table.data-table tbody tr:last-child td { border-bottom: none; }
   backdrop-filter: blur(var(--glass-blur)) saturate(140%);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius);
-  padding: 14px;
+  padding: 12px;
   box-shadow: var(--glass-shadow);
+  max-width: 300px;   /* compacto y centrado, no a todo el ancho */
+  margin: 0 auto;
 }
 .car-diagram svg { width: 100%; height: auto; display: block; }
 .car-zone {
@@ -458,10 +460,11 @@ table.data-table tbody tr:last-child td { border-bottom: none; }
 .car-zone.damaged.selected { fill: rgba(198,40,40,.6); }
 .car-diagram.readonly .car-zone { cursor: default; }
 .car-zone-label {
-  font-size: 11px;
+  font-size: 9px;
   fill: var(--color-text);
   pointer-events: none;
   text-anchor: middle;
+  dominant-baseline: middle;
   font-weight: 600;
 }
 .car-diagram-caption {
