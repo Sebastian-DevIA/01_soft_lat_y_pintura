@@ -70,3 +70,6 @@ node_modules/
 # Archivos de distribución Python
 *.whl
 .claude/
+
+# Página puente de dev para screenshots (no versionar)
+frontend/_boot.html
