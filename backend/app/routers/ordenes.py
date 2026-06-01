@@ -3,7 +3,6 @@ from sqlalchemy.orm import Session
 
 from app.dependencies.auth import get_current_user
 from app.dependencies.db import get_db
-from app.models.orden_trabajo import OrdenTrabajo
 from app.models.usuario import Usuario
 from app.schemas.orden import (
     OrdenCreateRequest,
@@ -27,13 +26,12 @@ def listar_ordenes(
     db: Session = Depends(get_db),
     _: Usuario = Depends(get_current_user),
 ):
-    q = db.query(OrdenTrabajo)
-    if estado:
-        q = q.filter(OrdenTrabajo.estado == estado)
-    return q.order_by(OrdenTrabajo.created_at.desc()).offset(skip).limit(limit).all()
+    return orden_service.listar_ordenes(db, estado, skip, limit)
 
 
-@router.post("/", response_model=OrdenResumenResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/", response_model=OrdenResumenResponse, status_code=status.HTTP_201_CREATED
+)
 def crear_orden(
     data: OrdenCreateRequest,
     db: Session = Depends(get_db),
@@ -48,7 +46,7 @@ def obtener_orden(
     db: Session = Depends(get_db),
     _: Usuario = Depends(get_current_user),
 ):
-    return orden_service._get_orden_o_404(db, orden_id)
+    return orden_service.obtener_orden(db, orden_id)
 
 
 @router.patch("/{orden_id}/estado", response_model=OrdenResumenResponse)
@@ -80,7 +78,11 @@ def aplicar_descuento(
     return orden_service.aplicar_descuento(db, orden_id, data.descuento_porcentaje)
 
 
-@router.post("/{orden_id}/items", response_model=ItemCotizacionResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{orden_id}/items",
+    response_model=ItemCotizacionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 def agregar_item(
     orden_id: int,
     data: ItemCotizacionRequest,

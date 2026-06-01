@@ -40,7 +40,9 @@ def obtener_personal(
 ):
     empleado = db.query(Personal).filter(Personal.id == personal_id).first()
     if not empleado:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Empleado no encontrado")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Empleado no encontrado"
+        )
     return empleado
 
 
@@ -53,7 +55,9 @@ def actualizar_personal(
 ):
     empleado = db.query(Personal).filter(Personal.id == personal_id).first()
     if not empleado:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Empleado no encontrado")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Empleado no encontrado"
+        )
     for campo, valor in data.model_dump().items():
         setattr(empleado, campo, valor)
     db.commit()
@@ -69,7 +73,9 @@ def toggle_activo(
 ):
     empleado = db.query(Personal).filter(Personal.id == personal_id).first()
     if not empleado:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Empleado no encontrado")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Empleado no encontrado"
+        )
     empleado.activo = not empleado.activo
     db.commit()
     db.refresh(empleado)

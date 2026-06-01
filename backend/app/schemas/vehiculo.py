@@ -30,6 +30,7 @@ class VehiculoResponse(BaseModel):
     color: str | None
     vin: str | None
     kilometraje: int | None
+    activo: bool
     created_at: datetime
 
     model_config = {"from_attributes": True}

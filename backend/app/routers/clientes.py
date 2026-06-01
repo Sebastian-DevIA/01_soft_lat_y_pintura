@@ -12,7 +12,9 @@ router = APIRouter(prefix="/api/v1/clientes", tags=["Clientes"])
 
 @router.get("/", response_model=list[ClienteListResponse])
 def listar_clientes(
-    busqueda: str | None = Query(None, description="Buscar por nombre, apellido o cédula"),
+    busqueda: str | None = Query(
+        None, description="Buscar por nombre, apellido o cédula"
+    ),
     activo: bool = Query(True),
     skip: int = 0,
     limit: int = 50,
@@ -57,7 +59,9 @@ def obtener_cliente(
 ):
     cliente = db.query(Cliente).filter(Cliente.id == cliente_id).first()
     if not cliente:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cliente no encontrado")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Cliente no encontrado"
+        )
     return cliente
 
 
@@ -70,7 +74,9 @@ def actualizar_cliente(
 ):
     cliente = db.query(Cliente).filter(Cliente.id == cliente_id).first()
     if not cliente:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cliente no encontrado")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Cliente no encontrado"
+        )
     for campo, valor in data.model_dump().items():
         setattr(cliente, campo, valor)
     db.commit()
@@ -86,6 +92,8 @@ def desactivar_cliente(
 ):
     cliente = db.query(Cliente).filter(Cliente.id == cliente_id).first()
     if not cliente:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cliente no encontrado")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Cliente no encontrado"
+        )
     cliente.activo = False
     db.commit()

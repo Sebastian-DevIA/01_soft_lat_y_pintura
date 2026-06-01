@@ -2,7 +2,9 @@ import os
 from jinja2 import Environment, FileSystemLoader
 from weasyprint import HTML
 
-TEMPLATES_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "templates")
+TEMPLATES_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "templates"
+)
 
 _jinja_env = Environment(loader=FileSystemLoader(TEMPLATES_DIR))
 

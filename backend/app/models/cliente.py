@@ -12,12 +12,18 @@ class Cliente(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     nombre: Mapped[str] = mapped_column(String(100), nullable=False)
     apellido: Mapped[str] = mapped_column(String(100), nullable=False)
-    cedula_ruc: Mapped[str] = mapped_column(String(20), unique=True, nullable=False, index=True)
+    cedula_ruc: Mapped[str] = mapped_column(
+        String(20), unique=True, nullable=False, index=True
+    )
     telefono: Mapped[str] = mapped_column(String(20), nullable=False)
     email: Mapped[str | None] = mapped_column(String(150), nullable=True)
     direccion: Mapped[str | None] = mapped_column(String(300), nullable=True)
-    activo: Mapped[bool] = mapped_column(Boolean, server_default=expression.true(), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
+    activo: Mapped[bool] = mapped_column(
+        Boolean, server_default=expression.true(), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        server_default=func.now(), nullable=False
+    )
 
     vehiculos: Mapped[list["Vehiculo"]] = relationship(  # noqa: F821
         "Vehiculo", back_populates="cliente"

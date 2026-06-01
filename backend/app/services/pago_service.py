@@ -9,7 +9,9 @@ from app.schemas.pago import PagoRequest
 def registrar_pago(db: Session, data: PagoRequest, usuario_id: int) -> Pago:
     factura = db.query(Factura).filter(Factura.id == data.factura_id).first()
     if not factura:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Factura no encontrada")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Factura no encontrada"
+        )
     if factura.estado == "PAGADA":
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

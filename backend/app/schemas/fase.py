@@ -18,6 +18,8 @@ class AsignacionResponse(BaseModel):
     personal_id: int
     notas: str | None
     created_at: datetime
+    # Nombre plano del técnico asignado (contrato con el Kanban del frontend)
+    personal_nombre: str | None = None
 
     model_config = {"from_attributes": True}
 

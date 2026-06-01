@@ -15,7 +15,14 @@ class OrdenEstadoRequest(BaseModel):
     @field_validator("estado")
     @classmethod
     def estado_valido(cls, v: str) -> str:
-        validos = ("PERITAJE", "COTIZACION", "APROBACION", "EN_PROCESO", "ENTREGADO", "CANCELADO")
+        validos = (
+            "PERITAJE",
+            "COTIZACION",
+            "APROBACION",
+            "EN_PROCESO",
+            "ENTREGADO",
+            "CANCELADO",
+        )
         if v not in validos:
             raise ValueError(f"Estado debe ser uno de: {validos}")
         return v
@@ -79,6 +86,10 @@ class OrdenResumenResponse(BaseModel):
     fecha_ingreso: datetime
     fecha_estimada_entrega: datetime | None
     created_at: datetime
+    # Campos planos del vehículo/cliente (contrato con el frontend)
+    vehiculo_placa: str | None = None
+    vehiculo_descripcion: str | None = None
+    cliente_nombre: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -100,5 +111,9 @@ class OrdenDetalleResponse(BaseModel):
     factura: FacturaResponse | None = None
     created_at: datetime
     updated_at: datetime
+    # Campos planos del vehículo/cliente (contrato con el frontend)
+    vehiculo_placa: str | None = None
+    vehiculo_descripcion: str | None = None
+    cliente_nombre: str | None = None
 
     model_config = {"from_attributes": True}

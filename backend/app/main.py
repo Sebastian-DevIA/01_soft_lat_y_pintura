@@ -1,9 +1,17 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
-from app.routers import auth, clientes, vehiculos, ordenes, facturas, pagos, fases, personal
+from app.routers import (
+    auth,
+    clientes,
+    vehiculos,
+    ordenes,
+    facturas,
+    pagos,
+    fases,
+    personal,
+)
 
 app = FastAPI(
     title=settings.app_name,
