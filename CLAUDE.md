@@ -86,6 +86,33 @@ Validación vive en `backend/app/services/orden_service.py`.
 
 ---
 
+## Estado actual / cambios recientes
+
+**Esquema:**
+- `Vehiculo` tiene flag `activo` (bool, default True) — mismo patrón que `Cliente`/`Personal`.
+  Lo agrega la migración `0002_vehiculo_activo`. `DELETE /vehiculos/{id}` es soft-delete
+  (`activo=False`, 204) y `GET /vehiculos/` filtra por `?activo=`.
+- La **fuente de verdad del esquema es Alembic** (`alembic upgrade head`). Los scripts
+  (`create_admin.py`/`seed_db.py`) usan `Base.metadata.create_all`, que **no** aplica
+  `ALTER` sobre tablas existentes: si reutilizas un `taller.db` viejo puede quedar
+  desfasado (le faltarían columnas nuevas como `vehiculos.activo`).
+
+**Endpoints añadidos:** `DELETE /vehiculos/{id}`, `GET /facturas/` (filtro `estado`),
+`GET /pagos/` (filtro `factura_id`), `GET/PUT /personal/{id}`, `PATCH /personal/{id}/activar`.
+La state machine se opera por UI vía `PATCH /ordenes/{id}/estado` (incluye CANCELADO).
+
+**Respuestas enriquecidas (para la UI):**
+- `OrdenResumenResponse` y `OrdenDetalleResponse` incluyen `vehiculo_placa`,
+  `vehiculo_descripcion` (marca+modelo) y `cliente_nombre`. Se pueblan en
+  `orden_service` (`_campos_planos` + `_a_resumen_response`/`_a_detalle_response`)
+  vía `OrdenTrabajo.vehiculo → Vehiculo.cliente`. **Importante:** cualquier endpoint
+  nuevo que retorne una orden debe pasar por estos helpers (no retornar el ORM crudo)
+  o los campos planos saldrán `null`.
+- `AsignacionResponse` incluye `personal_nombre`; se puebla en `fase_service`
+  (`joinedload(FaseTrabajo.asignaciones).joinedload(Asignacion.personal_asignado)`).
+
+---
+
 ## Estructura de archivos
 
 ```
@@ -133,7 +160,8 @@ backend/
 │   └── seed_db.py
 └── alembic/
     ├── versions/
-    │   └── 0001_initial_schema.py  ← migración inicial completa
+    │   ├── 0001_initial_schema.py   ← migración inicial completa
+    │   └── 0002_vehiculo_activo.py  ← add column vehiculos.activo (down_revision="0001")
     └── env.py
 ```
 
@@ -232,6 +260,35 @@ black backend/app/
 - Todas las rutas excepto `POST /api/v1/auth/login` requieren JWT válido
 - Sin hardcode de credenciales en ningún archivo
 - `requirements.txt` con versiones exactas
+
+---
+
+## Desarrollo local (entorno WSL)
+
+El proyecto vive en WSL (`/home/arcaoexdi/ao_development/01_soft_lat_y_pintura`) y se
+edita desde Windows por `\\wsl.localhost\Ubuntu\...`. Notas para correr/validar:
+
+- El `python3` del **sistema en WSL** (3.12) tiene todas las dependencias (FastAPI,
+  SQLAlchemy, Alembic, passlib, jose, WeasyPrint, pytest, flake8, black). El `.venv`
+  del repo puede estar incompleto. Ejecutar comandos vía `wsl.exe -d Ubuntu -- bash -lc "..."`.
+- El Python de **Windows** y la herramienta Bash de Git Bash **no** tienen las deps:
+  no sirven para levantar el backend.
+- Backend: `uvicorn app.main:app --host 0.0.0.0 --port 8000 --app-dir backend`.
+  Frontend: servirlo por HTTP (`python3 -m http.server 8080 --directory frontend`),
+  **nunca** `file://` (CORS → *Failed to fetch*).
+- `.env` debe incluir el origen del frontend en `ALLOWED_ORIGINS` (p. ej. `http://localhost:8080`).
+  WSL2 reenvía `localhost` a Windows, así que el navegador alcanza ambos puertos.
+- Usuario demo: `admin` / `admin123` (de `create_admin.py`/`seed_db.py`).
+
+## Despliegue (gratuito)
+
+Frontend y backend se despliegan por separado (ver README → "Despliegue gratuito"):
+- **Frontend** estático: Cloudflare Pages (ancho de banda ilimitado) o GitHub Pages.
+  Ajustar `BASE_URL` en `frontend/js/api.js` a la URL pública del backend.
+- **Backend**: Render (free, se duerme por inactividad) o Koyeb. Fly.io ya no tiene free
+  tier; Railway solo da ~$1/mes. **SQLite es efímero** en estos tiers → para persistir,
+  usar Postgres gratis (Neon/Supabase) y cambiar `DATABASE_URL`. WeasyPrint requiere
+  libs del sistema (pango/cairo) → usar Dockerfile. CORS y `SECRET_KEY` por env.
 
 ---
 

@@ -72,7 +72,8 @@ La interfaz usa un tema **Liquid Glass** (vidrio translúcido tipo Apple) implem
 │   │   └── seed_db.py           ← datos de demo (3 clientes, 3 vehículos)
 │   └── alembic/
 │       ├── versions/
-│       │   └── 0001_initial_schema.py  ← migración inicial completa
+│       │   ├── 0001_initial_schema.py  ← migración inicial completa
+│       │   └── 0002_vehiculo_activo.py ← agrega vehiculos.activo (soft-delete)
 │       └── env.py
 ├── frontend/
 │   ├── index.html               ← SPA shell (hash routing)
@@ -86,10 +87,10 @@ La interfaz usa un tema **Liquid Glass** (vidrio translúcido tipo Apple) implem
 │       ├── utils.js             ← toast, modal, formatCurrency
 │       └── pages/
 │           ├── dashboard.js     ← métricas y últimas órdenes
-│           ├── clientes.js      ← lista + búsqueda + CRUD
-│           ├── ordenes.js       ← lista + detalle con tabs
-│           ├── seguimiento.js   ← Kanban: Ingreso | Reparación | Entrega
-│           └── personal.js      ← tabla del equipo
+│           ├── clientes.js      ← lista + búsqueda + CRUD + detalle con vehículos
+│           ├── ordenes.js       ← lista + asistente "Nueva Orden" + detalle con tabs
+│           ├── seguimiento.js   ← Kanban + asignación de personal a fases
+│           └── personal.js      ← tabla del equipo + edición
 ├── docs/
 ├── .env.example
 ├── requirements.txt
@@ -125,28 +126,41 @@ PERITAJE → COTIZACION → APROBACION → EN_PROCESO → ENTREGADO
 |--------|-----------------------------------|------------------------------------|
 | POST   | `/api/v1/auth/login`              | Login → JWT                        |
 | GET    | `/api/v1/auth/me`                 | Usuario autenticado                |
-| GET    | `/api/v1/clientes/`               | Listar clientes                    |
+| GET    | `/api/v1/clientes/`               | Listar clientes (búsqueda/activo)  |
 | POST   | `/api/v1/clientes/`               | Crear cliente                      |
-| GET    | `/api/v1/vehiculos/`              | Listar vehículos                   |
+| GET    | `/api/v1/clientes/{id}`           | Obtener cliente                    |
+| PUT    | `/api/v1/clientes/{id}`           | Actualizar cliente                 |
+| DELETE | `/api/v1/clientes/{id}`           | Desactivar cliente (soft-delete)   |
+| GET    | `/api/v1/vehiculos/`              | Listar vehículos (placa/cliente/activo) |
 | POST   | `/api/v1/vehiculos/`              | Crear vehículo                     |
+| GET    | `/api/v1/vehiculos/{id}`          | Obtener vehículo                   |
+| PUT    | `/api/v1/vehiculos/{id}`          | Actualizar vehículo                |
+| DELETE | `/api/v1/vehiculos/{id}`          | Desactivar vehículo (soft-delete)  |
 | GET    | `/api/v1/ordenes/`                | Listar órdenes (filtro por estado) |
 | POST   | `/api/v1/ordenes/`                | Crear orden                        |
 | GET    | `/api/v1/ordenes/{id}`            | Detalle completo (con factura)     |
+| PATCH  | `/api/v1/ordenes/{id}/estado`     | Cambiar estado (state machine / cancelar) |
 | PATCH  | `/api/v1/ordenes/{id}/aprobar`    | Aprobar cotización                 |
 | PATCH  | `/api/v1/ordenes/{id}/descuento`  | Aplicar descuento                  |
 | POST   | `/api/v1/ordenes/{id}/items`      | Agregar ítem de peritaje           |
 | PUT    | `/api/v1/ordenes/{id}/items/{id}` | Actualizar ítem                    |
 | DELETE | `/api/v1/ordenes/{id}/items/{id}` | Eliminar ítem                      |
 | POST   | `/api/v1/facturas/`               | Emitir factura                     |
+| GET    | `/api/v1/facturas/`               | Listar facturas (filtro por estado)|
 | GET    | `/api/v1/facturas/{id}`           | Obtener factura                    |
 | GET    | `/api/v1/facturas/{id}/pdf`       | Descargar PDF                      |
 | POST   | `/api/v1/pagos/`                  | Registrar pago                     |
-| GET    | `/api/v1/fases/orden/{id}`        | Fases de una orden                 |
+| GET    | `/api/v1/pagos/`                  | Listar pagos (filtro por factura)  |
+| GET    | `/api/v1/pagos/factura/{id}`      | Pagos de una factura               |
+| GET    | `/api/v1/fases/orden/{id}`        | Fases de una orden (con técnicos)  |
 | PATCH  | `/api/v1/fases/{id}/estado`       | Avanzar fase                       |
 | POST   | `/api/v1/fases/{id}/personal`     | Asignar personal a fase            |
 | DELETE | `/api/v1/fases/{id}/personal/{id}`| Remover personal de fase           |
-| GET    | `/api/v1/personal/`               | Listar personal                    |
+| GET    | `/api/v1/personal/`               | Listar personal (filtro activo)    |
 | POST   | `/api/v1/personal/`               | Crear empleado                     |
+| GET    | `/api/v1/personal/{id}`           | Obtener empleado                   |
+| PUT    | `/api/v1/personal/{id}`           | Actualizar empleado                |
+| PATCH  | `/api/v1/personal/{id}/activar`   | Activar / desactivar empleado      |
 
 ---
 
@@ -213,13 +227,26 @@ python backend/scripts/create_admin.py
 # 6. (Opcional) Datos de demo
 python backend/scripts/seed_db.py
 
-# 7. Iniciar servidor
+# 7. Iniciar el backend (API)
 uvicorn app.main:app --reload --app-dir backend
+
+# 8. Servir el frontend (en otra terminal) — NO lo abras como archivo file://
+#    porque el navegador bloquea las llamadas por CORS. Sírvelo por HTTP:
+python -m http.server 8080 --directory frontend
 ```
 
 - API: `http://localhost:8000`
-- Swagger: `http://localhost:8000/docs`
-- Frontend: abrir `frontend/index.html` en el navegador
+- Swagger: `http://localhost:8000/docs` (solo con `DEBUG=true`)
+- **Frontend: abrir `http://localhost:8080`** y entrar con `admin` / `admin123`.
+
+> ⚠️ **CORS:** el origen donde sirves el frontend debe estar en `ALLOWED_ORIGINS`
+> del `.env` (p. ej. `http://localhost:8080`). Si abres `index.html` con `file://`
+> el login fallará con *Failed to fetch*. La URL de la API la define `BASE_URL` en
+> `frontend/js/api.js` (por defecto `http://localhost:8000`).
+
+> 💡 La base de datos se crea con `alembic upgrade head` (fuente de verdad del
+> esquema). Si reutilizas un `taller.db` antiguo, aplica las migraciones para que
+> tenga las últimas columnas (p. ej. `vehiculos.activo`).
 
 ---
 
@@ -232,6 +259,49 @@ uvicorn app.main:app --reload --app-dir backend
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | Duración del token                   | `480`                           |
 | `DEBUG`                       | Activa `/docs` y `/redoc`            | `false`                         |
 | `ALLOWED_ORIGINS`             | CORS (separados por coma)            | `http://localhost:8000`         |
+
+---
+
+## Despliegue gratuito
+
+El proyecto separa **frontend** (estático) y **backend** (API), así que se pueden
+desplegar por separado usando tiers gratuitos. Recomendaciones vigentes (2026):
+
+### Frontend (SPA estática)
+
+| Plataforma | Por qué | Notas |
+|------------|---------|-------|
+| **Cloudflare Pages** (recomendado) | Ancho de banda **ilimitado** en el plan gratis + CDN global | Conecta el repo o sube `frontend/` |
+| **GitHub Pages** | Lo más simple si el repo ya está en GitHub | Publica la carpeta `frontend/` |
+| Netlify / Vercel | Buena DX | 100 GB/mes de ancho de banda gratis |
+
+Pasos (cualquiera): publicar la carpeta `frontend/` y editar `BASE_URL` en
+`frontend/js/api.js` para que apunte a la URL pública del backend.
+
+### Backend (FastAPI)
+
+| Plataforma | Free tier | Notas |
+|------------|-----------|-------|
+| **Render** (recomendado) | Web service siempre gratis (512 MB, 0.1 CPU), sin tarjeta | Se "duerme" tras inactividad → primer request lento (cold start) |
+| **Koyeb** | 1 web service + 1 Postgres gratis, sin tarjeta | Buena opción con DB persistente |
+| Railway | Solo ~$1/mes de crédito | Útil para pruebas, no para 24/7 |
+| ~~Fly.io~~ | Ya **no** tiene free tier para nuevos usuarios | — |
+
+**Consideraciones al desplegar el backend gratis:**
+
+1. **SQLite es efímero** en estos tiers: el disco se reinicia en cada redeploy/sleep
+   y se pierden los datos. Para una demo está bien (ejecutar `seed_db.py` al arrancar).
+   Para persistencia real y gratuita, usar un **Postgres gratis** (Neon o Supabase) y
+   cambiar `DATABASE_URL` (SQLAlchemy 2.0 funciona igual; revisar el driver `psycopg`).
+2. **CORS:** poner el dominio público del frontend en `ALLOWED_ORIGINS`.
+3. **SECRET_KEY:** generar una larga y aleatoria como variable de entorno (nunca commitearla).
+4. **WeasyPrint (PDF)** necesita librerías del sistema (`pango`, `cairo`, `gdk-pixbuf`).
+   En Render conviene un **Dockerfile** que las instale (`apt-get install -y libpango-1.0-0
+   libpangocairo-1.0-0 libgdk-pixbuf2.0-0`) o un build con esos paquetes.
+5. Comando de arranque típico: `uvicorn app.main:app --host 0.0.0.0 --port $PORT --app-dir backend`.
+
+> Alternativa "todo en uno": servir también el `frontend/` desde el propio backend
+> (montando `StaticFiles` en FastAPI) para desplegar un **único servicio** gratuito.
 
 ---
 
