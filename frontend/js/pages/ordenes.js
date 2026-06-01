@@ -1,5 +1,6 @@
 import { api } from '../api.js';
 import { formatCurrency, formatDate, stateBadge, toast, renderLoader, renderError, showModal, confirmDialog, showPdfViewer, escapeHtml } from '../utils.js';
+import { createCarDiagram } from '../components/CarDiagram.js';
 
 // State machine (debe reflejar TRANSICIONES_VALIDAS del backend)
 const TRANSICIONES_VALIDAS = {
@@ -373,6 +374,15 @@ async function renderDetalle(container, ordenId) {
       });
     });
 
+    // Mapa de daños (diagrama solo-lectura) en la pestaña de peritaje
+    const peritajeMount = container.querySelector('#peritaje-diagram-mount');
+    if (peritajeMount) {
+      peritajeMount.appendChild(createCarDiagram({
+        readonly: true,
+        damagedZones: orden.items.map(i => i.area_vehiculo),
+      }));
+    }
+
     // Cancelar orden
     container.querySelector('#btn-cancelar-orden')?.addEventListener('click', async () => {
       const ok = await confirmDialog({
@@ -446,6 +456,11 @@ async function renderDetalle(container, ordenId) {
 function renderTabPeritaje(orden) {
   const puedeEditar = ['PERITAJE', 'COTIZACION'].includes(orden.estado);
   return `
+    <div class="card mb-2">
+      <h3 class="mb-2">Mapa de daños del vehículo</h3>
+      <p class="text-muted mb-2" style="font-size:.85rem">Las zonas marcadas en rojo tienen daño registrado en el peritaje.</p>
+      <div id="peritaje-diagram-mount"></div>
+    </div>
     <div class="card">
       <div class="card-header">
         <h3>Áreas Dañadas</h3>
@@ -568,9 +583,11 @@ async function cargarFactura(container, ordenId) {
 
 // Crear/editar ítem de peritaje. Si `item` viene, es edición.
 function mostrarFormularioItem(container, ordenId, item) {
-  showModal({
+  const overlay = showModal({
     title: item ? 'Editar Área Dañada' : 'Agregar Área Dañada',
     body: `
+      <p class="text-muted mb-1" style="font-size:.85rem">Toca la zona dañada en el diagrama (o escríbela abajo).</p>
+      <div id="item-diagram-mount" class="mb-2"></div>
       <div class="form-group"><label>Área del vehículo*</label><input class="form-control" id="f-area" value="${escapeHtml(item?.area_vehiculo || '')}" placeholder="Ej: Puerta trasera izquierda" /></div>
       <div class="form-group"><label>Descripción*</label><input class="form-control" id="f-desc" value="${escapeHtml(item?.descripcion || '')}" placeholder="Ej: Abolladuras profundas y rayones" /></div>
       <div class="form-group"><label>Precio unitario (COP)*</label><input class="form-control" id="f-precio" type="number" min="1" value="${escapeHtml(item?.precio_unitario ?? '')}" /></div>
@@ -599,6 +616,18 @@ function mostrarFormularioItem(container, ordenId, item) {
       } catch (err) { toast(err.message, 'error'); return false; }
     }
   });
+
+  // Diagrama interactivo: al elegir una zona, rellena el campo "Área del vehículo".
+  const mount = overlay.querySelector('#item-diagram-mount');
+  if (mount) {
+    mount.appendChild(createCarDiagram({
+      selected: item?.area_vehiculo || null,
+      onZoneClick: (label) => {
+        const input = overlay.querySelector('#f-area');
+        if (input) input.value = label;
+      },
+    }));
+  }
 }
 
 function mostrarFormularioDescuento(container, ordenId, orden) {
