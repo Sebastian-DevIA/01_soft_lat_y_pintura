@@ -1,5 +1,5 @@
 import { api } from '../api.js';
-import { formatCurrency, formatDate, stateBadge, toast, renderLoader, renderError, showModal, escapeHtml } from '../utils.js';
+import { formatCurrency, formatDate, stateBadge, toast, renderLoader, renderError, showModal, confirmDialog, showPdfViewer, escapeHtml } from '../utils.js';
 
 // State machine (debe reflejar TRANSICIONES_VALIDAS del backend)
 const TRANSICIONES_VALIDAS = {
@@ -375,7 +375,12 @@ async function renderDetalle(container, ordenId) {
 
     // Cancelar orden
     container.querySelector('#btn-cancelar-orden')?.addEventListener('click', async () => {
-      if (!confirm('¿Cancelar esta orden? Esta acción no se puede revertir.')) return;
+      const ok = await confirmDialog({
+        title: 'Cancelar orden',
+        message: '¿Cancelar esta orden? Esta acción no se puede revertir.',
+        confirmText: 'Sí, cancelar orden',
+      });
+      if (!ok) return;
       try {
         await api.ordenes.cambiarEstado(ordenId, 'CANCELADO');
         toast('Orden cancelada', 'success');
@@ -398,7 +403,13 @@ async function renderDetalle(container, ordenId) {
 
     // Aprobar orden
     container.querySelector('#btn-aprobar')?.addEventListener('click', async () => {
-      if (!confirm('¿Confirmar aprobación del cliente?')) return;
+      const ok = await confirmDialog({
+        title: 'Aprobar cotización',
+        message: '¿Confirmar la aprobación del cliente? Se generará el adelanto del 50% y se crearán las fases de trabajo.',
+        confirmText: 'Sí, aprobar',
+        confirmClass: 'btn-success',
+      });
+      if (!ok) return;
       try {
         await api.ordenes.aprobar(ordenId);
         toast('Orden aprobada', 'success');
@@ -414,7 +425,12 @@ async function renderDetalle(container, ordenId) {
     // Eliminar ítems
     container.querySelectorAll('.btn-delete-item').forEach(btn => {
       btn.addEventListener('click', async () => {
-        if (!confirm('¿Eliminar este ítem?')) return;
+        const ok = await confirmDialog({
+          title: 'Eliminar ítem',
+          message: '¿Eliminar esta área dañada de la cotización?',
+          confirmText: 'Sí, eliminar',
+        });
+        if (!ok) return;
         try {
           await api.ordenes.deleteItem(ordenId, btn.dataset.id);
           toast('Ítem eliminado', 'success');
@@ -530,11 +546,17 @@ async function cargarFactura(container, ordenId) {
             <div class="total-row"><span>Pagado</span><span>${formatCurrency(f.monto_pagado)}</span></div>
             <div class="total-row total-final"><span>Pendiente</span><span>${formatCurrency(f.monto_total - f.monto_pagado)}</span></div>
           </div>
-          <div class="mt-2 flex gap-2">
-            <a class="btn btn-outline btn-sm" href="${api.facturas.pdfUrl(f.id)}" target="_blank">📄 Descargar PDF</a>
+          <div class="mt-2 flex gap-2 flex-wrap">
+            <button class="btn btn-primary btn-sm" id="btn-ver-pdf">📄 Ver PDF</button>
+            <button class="btn btn-outline btn-sm" id="btn-descargar-pdf">⬇️ Descargar</button>
+            <button class="btn btn-outline btn-sm" id="btn-compartir">📲 Enviar al cliente</button>
             ${f.estado !== 'PAGADA' ? '<button class="btn btn-success btn-sm" id="btn-registrar-pago">Registrar Pago</button>' : ''}
           </div>
         </div>`;
+
+      div.querySelector('#btn-ver-pdf').onclick = (e) => verPdfFactura(e.currentTarget, f);
+      div.querySelector('#btn-descargar-pdf').onclick = (e) => descargarPdfFactura(e.currentTarget, f);
+      div.querySelector('#btn-compartir').onclick = () => compartirFactura(orden, f);
       div.querySelector('#btn-registrar-pago')?.addEventListener('click', () => {
         mostrarFormularioPago(div, f, ordenId, container);
       });
@@ -601,6 +623,62 @@ function mostrarFormularioDescuento(container, ordenId, orden) {
       } catch (err) { toast(err.message, 'error'); return false; }
     }
   });
+}
+
+// Ver la factura en PDF dentro de un visor (fetch con JWT → Blob → objectURL).
+async function verPdfFactura(btn, f) {
+  btn.disabled = true;
+  const original = btn.textContent;
+  btn.textContent = 'Generando…';
+  try {
+    const blob = await api.facturas.pdfBlob(f.id);
+    const url = URL.createObjectURL(blob);
+    showPdfViewer({ url, title: `Factura ${f.numero_factura}`, filename: `${f.numero_factura}.pdf` });
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = original;
+  }
+}
+
+// Descargar el PDF directamente (mismo fetch autenticado, sin abrir el visor).
+async function descargarPdfFactura(btn, f) {
+  btn.disabled = true;
+  try {
+    const blob = await api.facturas.pdfBlob(f.id);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${f.numero_factura}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// Enviar al cliente: comparte un resumen por WhatsApp (compatible, sin SMTP en el server).
+function compartirFactura(orden, f) {
+  const pendiente = f.monto_total - f.monto_pagado;
+  const lineas = [
+    `*Taller LatonPaint* — Factura ${f.numero_factura}`,
+    orden.cliente_nombre ? `Cliente: ${orden.cliente_nombre}` : null,
+    orden.vehiculo_placa ? `Vehículo: ${orden.vehiculo_placa} (${orden.vehiculo_descripcion || ''})`.trim() : null,
+    `Total: ${formatCurrency(f.monto_total)}`,
+    `Pagado: ${formatCurrency(f.monto_pagado)}`,
+    `Saldo pendiente: ${formatCurrency(pendiente)}`,
+    f.estado === 'PAGADA'
+      ? '✅ Factura PAGADA. El vehículo puede ser entregado.'
+      : 'El vehículo se entrega al cancelar el saldo pendiente.',
+    'Gracias por confiar en nosotros.',
+  ].filter(Boolean);
+  const texto = encodeURIComponent(lineas.join('\n'));
+  window.open(`https://wa.me/?text=${texto}`, '_blank', 'noopener');
 }
 
 function mostrarFormularioPago(div, factura, ordenId, container) {

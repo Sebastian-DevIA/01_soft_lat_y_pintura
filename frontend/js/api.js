@@ -28,6 +28,24 @@ async function request(method, path, body = null) {
   return res.json();
 }
 
+// Descarga autenticada: devuelve un Blob (para archivos protegidos por JWT, como el PDF).
+// Un <a href>/window.open no sirven porque el navegador no adjunta el header Authorization.
+async function requestBlob(path) {
+  const token = getToken();
+  const headers = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const res = await fetch(`${BASE_URL}${path}`, { method: 'GET', headers });
+  if (res.status === 401) {
+    clearToken();
+    location.hash = '#/login';
+    throw new Error('Sesión expirada. Por favor inicia sesión nuevamente.');
+  }
+  if (!res.ok) {
+    throw new Error(`No se pudo generar el documento (error ${res.status}).`);
+  }
+  return res.blob();
+}
+
 export const api = {
   // Auth
   login: (username, password) => {
@@ -46,6 +64,7 @@ export const api = {
     create: (data) => request('POST', '/api/v1/clientes/', data),
     update: (id, data) => request('PUT', `/api/v1/clientes/${id}`, data),
     delete: (id)  => request('DELETE', `/api/v1/clientes/${id}`),
+    activar: (id) => request('PATCH', `/api/v1/clientes/${id}/activar`),
   },
 
   // Vehículos
@@ -76,6 +95,7 @@ export const api = {
     create: (data) => request('POST', '/api/v1/facturas/', data),
     get:    (id)   => request('GET', `/api/v1/facturas/${id}`),
     pdfUrl: (id)   => `${BASE_URL}/api/v1/facturas/${id}/pdf`,
+    pdfBlob:(id)   => requestBlob(`/api/v1/facturas/${id}/pdf`),
   },
 
   // Pagos

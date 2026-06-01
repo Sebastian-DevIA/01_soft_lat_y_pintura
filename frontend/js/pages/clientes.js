@@ -1,5 +1,11 @@
 import { api } from '../api.js';
-import { toast, renderLoader, renderError, renderEmpty, showModal, escapeHtml, formatDate } from '../utils.js';
+import {
+  toast, renderLoader, renderError, renderEmpty, showModal,
+  confirmDialog, escapeHtml, formatDate,
+} from '../utils.js';
+
+// Estado del filtro de la lista (true = activos, false = inactivos)
+let _verActivos = true;
 
 export const clientes = {
   title: 'Clientes',
@@ -16,14 +22,20 @@ export const clientes = {
 async function renderLista(container) {
   container.innerHTML = renderLoader();
   try {
-    const data = await api.clientes.list();
+    const data = await api.clientes.list(`?activo=${_verActivos}`);
     container.innerHTML = `
       <div class="flex justify-between align-center mb-2">
         <h2>Clientes</h2>
         <button class="btn btn-primary" id="btn-nuevo-cliente">+ Nuevo Cliente</button>
       </div>
-      <div class="search-bar">
-        <input class="form-control" id="busqueda" placeholder="Buscar por nombre o cédula..." />
+      <div class="toolbar mb-2">
+        <div class="search-bar">
+          <input class="form-control" id="busqueda" placeholder="Buscar por nombre o cédula..." />
+        </div>
+        <div class="segmented" role="tablist" aria-label="Filtrar por estado">
+          <button class="seg-btn ${_verActivos ? 'active' : ''}" id="seg-activos" role="tab" aria-selected="${_verActivos}">Activos</button>
+          <button class="seg-btn ${!_verActivos ? 'active' : ''}" id="seg-inactivos" role="tab" aria-selected="${!_verActivos}">Inactivos</button>
+        </div>
       </div>
       <div class="card">
         <div class="table-wrapper">
@@ -34,13 +46,19 @@ async function renderLista(container) {
         </div>
       </div>`;
 
-    container.querySelector('#btn-nuevo-cliente').onclick = () => mostrarFormulario(container, null);
-    container.querySelector('#busqueda').oninput = async (e) => {
-      const q = e.target.value.trim();
-      const res = await api.clientes.list(q ? `?busqueda=${encodeURIComponent(q)}` : '');
+    container.querySelector('#btn-nuevo-cliente').onclick = () =>
+      _formularioCliente(null, () => renderLista(container));
+
+    const recargar = async (q = '') => {
+      const params = `?activo=${_verActivos}${q ? `&busqueda=${encodeURIComponent(q)}` : ''}`;
+      const res = await api.clientes.list(params);
       container.querySelector('#tabla-clientes').innerHTML = renderFilas(res);
       attachRowEvents(container);
     };
+
+    container.querySelector('#busqueda').oninput = (e) => recargar(e.target.value.trim());
+    container.querySelector('#seg-activos').onclick = () => { _verActivos = true; renderLista(container); };
+    container.querySelector('#seg-inactivos').onclick = () => { _verActivos = false; renderLista(container); };
     attachRowEvents(container);
   } catch (err) {
     container.innerHTML = renderError(err.message);
@@ -48,15 +66,22 @@ async function renderLista(container) {
 }
 
 function renderFilas(lista) {
-  if (!lista.length) return '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--color-muted)">Sin clientes</td></tr>';
+  if (!lista.length) {
+    const msg = _verActivos ? 'Sin clientes activos. Crea el primero.' : 'No hay clientes inactivos.';
+    return `<tr><td colspan="5">${renderEmpty(msg, '👤')}</td></tr>`;
+  }
   return lista.map(c => `
     <tr>
       <td><strong>${escapeHtml(c.nombre)} ${escapeHtml(c.apellido)}</strong></td>
       <td>${escapeHtml(c.cedula_ruc)}</td>
       <td>${escapeHtml(c.telefono)}</td>
       <td><span class="badge ${c.activo ? 'badge-EN_PROCESO' : 'badge-CANCELADO'}">${c.activo ? 'Activo' : 'Inactivo'}</span></td>
-      <td>
+      <td class="flex gap-1">
         <button class="btn btn-outline btn-sm" data-id="${c.id}" data-action="ver">Ver</button>
+        ${c.activo
+          ? `<button class="btn btn-outline btn-sm" data-id="${c.id}" data-action="editar">Editar</button>
+             <button class="btn btn-danger btn-sm" data-id="${c.id}" data-action="eliminar">Eliminar</button>`
+          : `<button class="btn btn-success btn-sm" data-id="${c.id}" data-action="reactivar">Reactivar</button>`}
       </td>
     </tr>`).join('');
 }
@@ -65,9 +90,42 @@ function attachRowEvents(container) {
   container.querySelectorAll('[data-action="ver"]').forEach(btn => {
     btn.onclick = () => location.hash = `#/clientes/${btn.dataset.id}`;
   });
+  container.querySelectorAll('[data-action="editar"]').forEach(btn => {
+    btn.onclick = async () => {
+      try {
+        const cliente = await api.clientes.get(btn.dataset.id);
+        _formularioCliente(cliente, () => renderLista(container));
+      } catch (err) { toast(err.message, 'error'); }
+    };
+  });
+  container.querySelectorAll('[data-action="eliminar"]').forEach(btn => {
+    btn.onclick = async () => {
+      const ok = await confirmDialog({
+        title: 'Eliminar cliente',
+        message: 'El cliente se marcará como inactivo (no se borra su historial). Podrás reactivarlo después. ¿Continuar?',
+        confirmText: 'Sí, eliminar',
+      });
+      if (!ok) return;
+      try {
+        await api.clientes.delete(btn.dataset.id);
+        toast('Cliente desactivado', 'success');
+        renderLista(container);
+      } catch (err) { toast(err.message, 'error'); }
+    };
+  });
+  container.querySelectorAll('[data-action="reactivar"]').forEach(btn => {
+    btn.onclick = async () => {
+      try {
+        await api.clientes.activar(btn.dataset.id);
+        toast('Cliente reactivado', 'success');
+        renderLista(container);
+      } catch (err) { toast(err.message, 'error'); }
+    };
+  });
 }
 
-function mostrarFormulario(container, cliente) {
+// Formulario unificado crear/editar cliente. `cliente` null = crear.
+function _formularioCliente(cliente, onSuccess) {
   showModal({
     title: cliente ? 'Editar Cliente' : 'Nuevo Cliente',
     body: `
@@ -75,18 +133,22 @@ function mostrarFormulario(container, cliente) {
       <div class="form-group"><label>Apellido*</label><input class="form-control" id="f-apellido" value="${escapeHtml(cliente?.apellido || '')}" /></div>
       <div class="form-group"><label>Cédula / RUC*</label><input class="form-control" id="f-cedula" value="${escapeHtml(cliente?.cedula_ruc || '')}" /></div>
       <div class="form-group"><label>Teléfono*</label><input class="form-control" id="f-telefono" value="${escapeHtml(cliente?.telefono || '')}" /></div>
-      <div class="form-group"><label>Email</label><input class="form-control" id="f-email" value="${escapeHtml(cliente?.email || '')}" /></div>
+      <div class="form-group"><label>Email</label><input class="form-control" id="f-email" type="email" value="${escapeHtml(cliente?.email || '')}" /></div>
       <div class="form-group"><label>Dirección</label><input class="form-control" id="f-direccion" value="${escapeHtml(cliente?.direccion || '')}" /></div>`,
     confirmText: 'Guardar',
     onConfirm: async (overlay) => {
       const payload = {
-        nombre:      overlay.querySelector('#f-nombre').value.trim(),
-        apellido:    overlay.querySelector('#f-apellido').value.trim(),
-        cedula_ruc:  overlay.querySelector('#f-cedula').value.trim(),
-        telefono:    overlay.querySelector('#f-telefono').value.trim(),
-        email:       overlay.querySelector('#f-email').value.trim() || null,
-        direccion:   overlay.querySelector('#f-direccion').value.trim() || null,
+        nombre:     overlay.querySelector('#f-nombre').value.trim(),
+        apellido:   overlay.querySelector('#f-apellido').value.trim(),
+        cedula_ruc: overlay.querySelector('#f-cedula').value.trim(),
+        telefono:   overlay.querySelector('#f-telefono').value.trim(),
+        email:      overlay.querySelector('#f-email').value.trim() || null,
+        direccion:  overlay.querySelector('#f-direccion').value.trim() || null,
       };
+      if (!payload.nombre || !payload.apellido || !payload.cedula_ruc || !payload.telefono) {
+        toast('Nombre, apellido, cédula y teléfono son obligatorios', 'error');
+        return false;
+      }
       try {
         if (cliente) {
           await api.clientes.update(cliente.id, payload);
@@ -95,7 +157,7 @@ function mostrarFormulario(container, cliente) {
           await api.clientes.create(payload);
           toast('Cliente creado', 'success');
         }
-        renderLista(container);
+        if (onSuccess) onSuccess();
       } catch (err) {
         toast(err.message, 'error');
         return false;
@@ -140,7 +202,8 @@ async function renderDetalle(container, clienteId) {
         <div id="tabla-vehiculos">${renderTablaVehiculos(vehiculos)}</div>
       </div>`;
 
-    container.querySelector('#btn-editar-cliente').onclick = () => mostrarFormularioEdit(container, cliente);
+    container.querySelector('#btn-editar-cliente').onclick = () =>
+      _formularioCliente(cliente, () => renderDetalle(container, clienteId));
     container.querySelector('#btn-nuevo-vehiculo').onclick = () => mostrarFormularioVehiculo(container, clienteId, null);
     attachVehiculoEvents(container, clienteId, vehiculos);
   } catch (err) {
@@ -181,43 +244,18 @@ function attachVehiculoEvents(container, clienteId, vehiculos) {
   });
   container.querySelectorAll('.btn-del-veh').forEach(btn => {
     btn.onclick = async () => {
-      if (!confirm('¿Eliminar este vehículo?')) return;
+      const ok = await confirmDialog({
+        title: 'Eliminar vehículo',
+        message: '¿Eliminar este vehículo? Esta acción lo marcará como inactivo.',
+        confirmText: 'Sí, eliminar',
+      });
+      if (!ok) return;
       try {
         await api.vehiculos.delete(btn.dataset.id);
         toast('Vehículo eliminado', 'success');
         renderDetalle(container, clienteId);
       } catch (err) { toast(err.message, 'error'); }
     };
-  });
-}
-
-// Editar cliente desde el detalle (re-renderiza el detalle al guardar)
-function mostrarFormularioEdit(container, cliente) {
-  showModal({
-    title: 'Editar Cliente',
-    body: `
-      <div class="form-group"><label>Nombre*</label><input class="form-control" id="f-nombre" value="${escapeHtml(cliente.nombre)}" /></div>
-      <div class="form-group"><label>Apellido*</label><input class="form-control" id="f-apellido" value="${escapeHtml(cliente.apellido)}" /></div>
-      <div class="form-group"><label>Cédula / RUC*</label><input class="form-control" id="f-cedula" value="${escapeHtml(cliente.cedula_ruc)}" /></div>
-      <div class="form-group"><label>Teléfono*</label><input class="form-control" id="f-telefono" value="${escapeHtml(cliente.telefono)}" /></div>
-      <div class="form-group"><label>Email</label><input class="form-control" id="f-email" value="${escapeHtml(cliente.email || '')}" /></div>
-      <div class="form-group"><label>Dirección</label><input class="form-control" id="f-direccion" value="${escapeHtml(cliente.direccion || '')}" /></div>`,
-    confirmText: 'Guardar',
-    onConfirm: async (overlay) => {
-      const payload = {
-        nombre:      overlay.querySelector('#f-nombre').value.trim(),
-        apellido:    overlay.querySelector('#f-apellido').value.trim(),
-        cedula_ruc:  overlay.querySelector('#f-cedula').value.trim(),
-        telefono:    overlay.querySelector('#f-telefono').value.trim(),
-        email:       overlay.querySelector('#f-email').value.trim() || null,
-        direccion:   overlay.querySelector('#f-direccion').value.trim() || null,
-      };
-      try {
-        await api.clientes.update(cliente.id, payload);
-        toast('Cliente actualizado', 'success');
-        renderDetalle(container, cliente.id);
-      } catch (err) { toast(err.message, 'error'); return false; }
-    }
   });
 }
 

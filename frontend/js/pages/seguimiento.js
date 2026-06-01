@@ -1,5 +1,5 @@
 import { api } from '../api.js';
-import { renderLoader, renderError, toast, showModal, escapeHtml } from '../utils.js';
+import { renderLoader, renderError, toast, showModal, confirmDialog, escapeHtml } from '../utils.js';
 
 const FASES_ORDEN = ['INGRESO', 'REPARACION', 'ENTREGA'];
 const FASES_LABEL = { INGRESO: 'Ingreso', REPARACION: 'Reparación', ENTREGA: 'Entrega' };
@@ -89,7 +89,12 @@ export const seguimiento = {
       container.querySelectorAll('.btn-quitar').forEach(btn => {
         btn.addEventListener('click', async (e) => {
           e.stopPropagation();
-          if (!confirm('¿Quitar a este técnico de la fase?')) return;
+          const ok = await confirmDialog({
+            title: 'Quitar técnico',
+            message: '¿Quitar a este técnico de la fase?',
+            confirmText: 'Sí, quitar',
+          });
+          if (!ok) return;
           try {
             await api.fases.removerPersonal(btn.dataset.faseId, btn.dataset.personalId);
             toast('Técnico removido', 'success');
