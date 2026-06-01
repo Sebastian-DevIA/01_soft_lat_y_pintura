@@ -11,8 +11,23 @@ export function logout() {
   location.hash = '#/login';
 }
 
+// Considera autenticado solo si hay token Y no está expirado. Así un token viejo
+// no deja "entrar" para luego rebotar con 401 (sensación de "me sacó del sistema").
 export function isAuthenticated() {
-  return !!getToken();
+  const token = getToken();
+  if (!token) return false;
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    if (payload.exp && payload.exp * 1000 < Date.now()) {
+      clearToken();
+      return false;
+    }
+  } catch (_) {
+    // Token con formato inesperado: lo tratamos como inválido.
+    clearToken();
+    return false;
+  }
+  return true;
 }
 
 export async function getCurrentUser() {
