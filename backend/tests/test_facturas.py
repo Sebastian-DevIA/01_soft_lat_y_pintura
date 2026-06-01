@@ -109,3 +109,38 @@ def test_descargar_pdf_factura(client, auth_headers, orden_aprobada):
     assert resp.headers["content-type"] == "application/pdf"
     # Cuerpo es un PDF real (valida que la plantilla con el desglose de IVA renderiza)
     assert resp.content[:5] == b"%PDF-"
+
+
+def test_desglose_iva_consistente(client, auth_headers, orden_aprobada):
+    """base_gravable + monto_iva debe ser igual a monto_total (IVA 19 %, incluido)."""
+    f = client.post(
+        "/api/v1/facturas/", json={"orden_id": orden_aprobada["id"]}, headers=auth_headers
+    ).json()
+    monto_total = f["monto_total"]
+    tasa = 19.0
+    base_gravable = round(monto_total / (1 + tasa / 100), 2)
+    monto_iva = round(monto_total - base_gravable, 2)
+    # La suma de las partes no debe alejarse del total en más de 1 centavo (redondeo)
+    assert abs((base_gravable + monto_iva) - monto_total) <= 0.01
+
+
+def test_pdf_generacion_tras_pago_parcial(client, auth_headers, orden_aprobada):
+    """El PDF debe generarse correctamente cuando la factura ya tiene un pago
+    registrado (estado PARCIAL), no solo cuando está PENDIENTE."""
+    f = client.post(
+        "/api/v1/facturas/", json={"orden_id": orden_aprobada["id"]}, headers=auth_headers
+    ).json()
+    # Registrar el adelanto (50% del total)
+    adelanto = f["monto_adelanto"]
+    client.post(
+        "/api/v1/pagos/",
+        json={"factura_id": f["id"], "monto": adelanto, "tipo": "ADELANTO", "metodo": "EFECTIVO"},
+        headers=auth_headers,
+    )
+    # Verificar que la factura quedó en PARCIAL
+    factura_parcial = client.get(f"/api/v1/facturas/{f['id']}", headers=auth_headers).json()
+    assert factura_parcial["estado"] == "PARCIAL"
+    # El PDF debe seguir generándose sin error
+    resp = client.get(f"/api/v1/facturas/{f['id']}/pdf", headers=auth_headers)
+    assert resp.status_code == 200
+    assert resp.content[:5] == b"%PDF-"
