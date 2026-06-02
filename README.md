@@ -90,7 +90,8 @@ en `:8080`). El paso a paso está en [Cómo correr el proyecto](#cómo-correr-el
 │   └── alembic/
 │       ├── versions/
 │       │   ├── 0001_initial_schema.py  ← migración inicial completa
-│       │   └── 0002_vehiculo_activo.py ← agrega vehiculos.activo (soft-delete)
+│       │   ├── 0002_vehiculo_activo.py ← agrega vehiculos.activo (soft-delete)
+│       │   └── 0003_orden_activo.py    ← agrega ordenes_trabajo.activo (soft-delete)
 │       └── env.py
 ├── frontend/
 │   ├── index.html               ← SPA shell (hash routing)
@@ -105,7 +106,7 @@ en `:8080`). El paso a paso está en [Cómo correr el proyecto](#cómo-correr-el
 │       └── pages/
 │           ├── dashboard.js     ← métricas y últimas órdenes
 │           ├── clientes.js      ← lista + búsqueda + CRUD + detalle con vehículos
-│           ├── ordenes.js       ← lista + asistente "Nueva Orden" + detalle con tabs
+│           ├── ordenes.js       ← lista con CRUD (editar/eliminar/reactivar) + asistente "Nueva Orden" + detalle con tabs
 │           ├── seguimiento.js   ← Kanban + asignación de personal a fases
 │           └── personal.js      ← tabla del equipo + edición
 ├── docs/
@@ -230,6 +231,13 @@ proyecto es Vanilla por diseño).
 - Filtro **Activos / Inactivos** y búsqueda por nombre/cédula.
 - Confirmaciones con modal de vidrio (no diálogos nativos), validación de campos y estados de carga/vacío/error.
 - Ficha de cliente con sus **vehículos** (CRUD anidado).
+
+### Gestión de órdenes de trabajo (CRUD completo)
+- Lista/historial con filtro por **estado** y por **Activas / Inactivas**.
+- **Editar** una orden (observaciones, fecha estimada y **reasignar vehículo** solo en
+  PERITAJE/COTIZACIÓN), **eliminar** (soft-delete, reversible) y **reactivar**, todo
+  desde el listado con confirmaciones y estados de carga/vacío/error.
+- Respeta la state machine: las órdenes en CANCELADO/ENTREGADO no se editan.
 
 ### Facturación y PDF
 - Emisión de factura (adelanto 50%) y registro de pagos.
