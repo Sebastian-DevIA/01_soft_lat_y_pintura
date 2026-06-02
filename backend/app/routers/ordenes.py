@@ -6,6 +6,7 @@ from app.dependencies.db import get_db
 from app.models.usuario import Usuario
 from app.schemas.orden import (
     OrdenCreateRequest,
+    OrdenUpdateRequest,
     OrdenDetalleResponse,
     OrdenResumenResponse,
     OrdenEstadoRequest,
@@ -21,12 +22,13 @@ router = APIRouter(prefix="/api/v1/ordenes", tags=["Órdenes de Trabajo"])
 @router.get("/", response_model=list[OrdenResumenResponse])
 def listar_ordenes(
     estado: str | None = Query(None),
+    activo: bool = Query(True),
     skip: int = 0,
     limit: int = 50,
     db: Session = Depends(get_db),
     _: Usuario = Depends(get_current_user),
 ):
-    return orden_service.listar_ordenes(db, estado, skip, limit)
+    return orden_service.listar_ordenes(db, estado, activo, skip, limit)
 
 
 @router.post(
@@ -47,6 +49,34 @@ def obtener_orden(
     _: Usuario = Depends(get_current_user),
 ):
     return orden_service.obtener_orden(db, orden_id)
+
+
+@router.put("/{orden_id}", response_model=OrdenDetalleResponse)
+def actualizar_orden(
+    orden_id: int,
+    data: OrdenUpdateRequest,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(get_current_user),
+):
+    return orden_service.actualizar_orden(db, orden_id, data)
+
+
+@router.delete("/{orden_id}", status_code=status.HTTP_204_NO_CONTENT)
+def eliminar_orden(
+    orden_id: int,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(get_current_user),
+):
+    orden_service.eliminar_orden(db, orden_id)
+
+
+@router.patch("/{orden_id}/activar", response_model=OrdenDetalleResponse)
+def activar_orden(
+    orden_id: int,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(get_current_user),
+):
+    return orden_service.activar_orden(db, orden_id)
 
 
 @router.patch("/{orden_id}/estado", response_model=OrdenResumenResponse)

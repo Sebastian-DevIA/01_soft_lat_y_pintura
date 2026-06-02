@@ -9,6 +9,13 @@ class OrdenCreateRequest(BaseModel):
     fecha_estimada_entrega: datetime | None = None
 
 
+class OrdenUpdateRequest(BaseModel):
+    # Todos opcionales: solo se actualizan los campos que vengan en el body.
+    observaciones: str | None = None
+    fecha_estimada_entrega: datetime | None = None
+    vehiculo_id: int | None = None
+
+
 class OrdenEstadoRequest(BaseModel):
     estado: str
 

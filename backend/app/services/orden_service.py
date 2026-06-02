@@ -7,11 +7,13 @@ from app.models.orden_trabajo import OrdenTrabajo, TRANSICIONES_VALIDAS
 from app.models.fase_trabajo import FaseTrabajo, ORDEN_FASES
 from app.schemas.orden import (
     OrdenCreateRequest,
+    OrdenUpdateRequest,
     ItemCotizacionRequest,
     OrdenResumenResponse,
     OrdenDetalleResponse,
 )
 from app.models.item_cotizacion import ItemCotizacion
+from app.models.vehiculo import Vehiculo
 
 
 def crear_orden(
@@ -32,9 +34,9 @@ def crear_orden(
 
 
 def listar_ordenes(
-    db: Session, estado: str | None, skip: int, limit: int
+    db: Session, estado: str | None, activo: bool, skip: int, limit: int
 ) -> list[OrdenResumenResponse]:
-    q = db.query(OrdenTrabajo)
+    q = db.query(OrdenTrabajo).filter(OrdenTrabajo.activo == activo)
     if estado:
         q = q.filter(OrdenTrabajo.estado == estado)
     ordenes = q.order_by(OrdenTrabajo.created_at.desc()).offset(skip).limit(limit).all()
@@ -43,6 +45,62 @@ def listar_ordenes(
 
 def obtener_orden(db: Session, orden_id: int) -> OrdenDetalleResponse:
     orden = _get_orden_o_404(db, orden_id)
+    return _a_detalle_response(orden)
+
+
+def actualizar_orden(
+    db: Session, orden_id: int, data: OrdenUpdateRequest
+) -> OrdenDetalleResponse:
+    orden = _get_orden_o_404(db, orden_id)
+    # Regla de negocio: orden CANCELADA o ENTREGADA no puede modificarse.
+    if orden.estado in ("CANCELADO", "ENTREGADO"):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"No se puede modificar una orden en estado '{orden.estado}'",
+        )
+
+    # Solo tocar los campos que vengan en el body (exclude_unset).
+    cambios = data.model_dump(exclude_unset=True)
+
+    if "vehiculo_id" in cambios:
+        # Reasignar vehículo solo es válido antes de tener cotización aprobada.
+        if orden.estado not in ("PERITAJE", "COTIZACION"):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Solo se puede reasignar el vehículo en estado PERITAJE o COTIZACION",
+            )
+        vehiculo = (
+            db.query(Vehiculo).filter(Vehiculo.id == cambios["vehiculo_id"]).first()
+        )
+        if not vehiculo:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Vehículo no encontrado"
+            )
+        orden.vehiculo_id = cambios["vehiculo_id"]
+
+    if "observaciones" in cambios:
+        orden.observaciones = cambios["observaciones"]
+    if "fecha_estimada_entrega" in cambios:
+        orden.fecha_estimada_entrega = cambios["fecha_estimada_entrega"]
+
+    db.commit()
+    db.refresh(orden)  # recarga la orden (y deja accesible vehiculo→cliente)
+    return _a_detalle_response(orden)
+
+
+def eliminar_orden(db: Session, orden_id: int) -> None:
+    """Soft-delete: marca la orden como inactiva (activo=False)."""
+    orden = _get_orden_o_404(db, orden_id)
+    orden.activo = False
+    db.commit()
+
+
+def activar_orden(db: Session, orden_id: int) -> OrdenDetalleResponse:
+    """Alterna el estado activo/inactivo de la orden (permite reactivar tras soft-delete)."""
+    orden = _get_orden_o_404(db, orden_id)
+    orden.activo = not orden.activo
+    db.commit()
+    db.refresh(orden)
     return _a_detalle_response(orden)
 
 
