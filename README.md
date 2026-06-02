@@ -78,15 +78,16 @@ en `:8080`). El paso a paso está en [Cómo correr el proyecto](#cómo-correr-el
 │   │   └── versions/
 │   │       ├── 0001_initial_schema.py   ← esquema inicial completo
 │   │       ├── 0002_vehiculo_activo.py  ← agrega vehiculos.activo (soft-delete)
-│   │       └── 0003_orden_activo.py     ← agrega ordenes_trabajo.activo (soft-delete)
+│   │       ├── 0003_orden_activo.py     ← agrega ordenes_trabajo.activo (soft-delete)
+│   │       └── 0004_usuario_perfil.py   ← agrega usuarios.perfil (roles/RBAC)
 │   ├── app/
 │   │   ├── main.py              ← FastAPI app + CORS + registro de routers
 │   │   ├── config.py            ← Settings (pydantic-settings)
 │   │   ├── database.py          ← engine + SessionLocal + Base
 │   │   ├── models/              ← SQLAlchemy ORM (10 modelos)
-│   │   ├── schemas/             ← Pydantic v2 Request/Response (8 dominios)
-│   │   ├── routers/             ← endpoints por dominio (8 routers)
-│   │   ├── services/            ← lógica de negocio (5: orden, factura, pago, fase, pdf)
+│   │   ├── schemas/             ← Pydantic v2 Request/Response (9 dominios)
+│   │   ├── routers/             ← endpoints por dominio (9 routers)
+│   │   ├── services/            ← lógica de negocio (6: orden, factura, pago, fase, pdf, usuario)
 │   │   ├── dependencies/        ← db.py (get_db), auth.py (get_current_user/JWT)
 │   │   └── utils/               ← security.py (hash/verify password)
 │   ├── templates/factura_pdf.html   ← plantilla Jinja2 para el PDF
@@ -109,9 +110,10 @@ en `:8080`). El paso a paso está en [Cómo correr el proyecto](#cómo-correr-el
 │       └── pages/
 │           ├── dashboard.js     ← métricas y últimas órdenes
 │           ├── clientes.js      ← lista + búsqueda + CRUD + detalle con vehículos
-│           ├── ordenes.js       ← lista con CRUD (editar/eliminar/reactivar) + "Nueva Orden" + detalle con tabs
-│           ├── seguimiento.js   ← Kanban + asignación de personal a fases
-│           └── personal.js      ← tabla del equipo + edición
+│           ├── ordenes.js       ← lista con CRUD (editar/archivar/reactivar/eliminar definitivo) + "Nueva Orden" + detalle con tabs
+│           ├── seguimiento.js   ← Kanban + asignación de personal (avance de fase según perfil)
+│           ├── personal.js      ← tabla del equipo + edición
+│           └── usuarios.js      ← panel de admin: crear/editar usuarios y perfiles (RBAC)
 ├── docs/diagrama-flujo.md       ← diagrama del flujo del taller
 ├── scripts/dev_frontend.py      ← servidor estático del frontend SIN caché (desarrollo)
 ├── .env.example
@@ -151,7 +153,10 @@ PERITAJE → COTIZACION → APROBACION → EN_PROCESO → ENTREGADO
 | Método | Ruta                              | Descripción                        |
 |--------|-----------------------------------|------------------------------------|
 | POST   | `/api/v1/auth/login`              | Login → JWT                        |
-| GET    | `/api/v1/auth/me`                 | Usuario autenticado                |
+| GET    | `/api/v1/auth/me`                 | Usuario autenticado (incluye `perfil`) |
+| GET    | `/api/v1/usuarios/`               | Listar usuarios (solo admin)       |
+| POST   | `/api/v1/usuarios/`               | Crear usuario con perfil (solo admin) |
+| PATCH  | `/api/v1/usuarios/{id}`           | Actualizar perfil/estado/datos (solo admin) |
 | GET    | `/api/v1/clientes/`               | Listar clientes (búsqueda/activo)  |
 | POST   | `/api/v1/clientes/`               | Crear cliente                      |
 | GET    | `/api/v1/clientes/{id}`           | Obtener cliente                    |
@@ -167,7 +172,8 @@ PERITAJE → COTIZACION → APROBACION → EN_PROCESO → ENTREGADO
 | POST   | `/api/v1/ordenes/`                | Crear orden                        |
 | GET    | `/api/v1/ordenes/{id}`            | Detalle completo (con factura)     |
 | PUT    | `/api/v1/ordenes/{id}`            | Editar orden (observaciones/fecha/vehículo) |
-| DELETE | `/api/v1/ordenes/{id}`            | Eliminar orden (soft-delete)       |
+| DELETE | `/api/v1/ordenes/{id}`            | Archivar orden (soft-delete)       |
+| DELETE | `/api/v1/ordenes/{id}/permanente` | Eliminar definitivamente (hard-delete; solo órdenes inactivas) |
 | PATCH  | `/api/v1/ordenes/{id}/activar`    | Reactivar / alternar orden         |
 | PATCH  | `/api/v1/ordenes/{id}/estado`     | Cambiar estado (state machine / cancelar) |
 | PATCH  | `/api/v1/ordenes/{id}/aprobar`    | Aprobar cotización                 |
@@ -234,6 +240,19 @@ proyecto es Vanilla por diseño).
 
 ## Funcionalidades destacadas
 
+### Usuarios y perfiles (panel de administración / RBAC)
+- **Panel de admin** (`#/usuarios`, visible solo para administradores) para **crear,
+  editar, activar/desactivar** usuarios y asignarles un **perfil**.
+- **Perfiles**: `ADMIN` (gestiona todo, incluidos los usuarios) y los operativos
+  `RECEPCIÓN` → fase INGRESO, `TÉCNICO` → fase REPARACIÓN, `ENTREGA` → fase ENTREGA.
+- Cada usuario entra con su perfil y, según él, **ve el estado de los vehículos**
+  (Kanban de seguimiento) y **solo actualiza la fase que le corresponde**; el resto queda
+  en *solo lectura*. El **sidebar** se adapta al perfil (las secciones de gestión son
+  solo para admin).
+- Seguridad: los endpoints de gestión de usuarios exigen administrador
+  (`get_current_admin` → **403** si no lo es); guardas para que un admin no se quite a
+  sí mismo el rol ni se desactive (**409**). Las contraseñas se guardan **hasheadas** (bcrypt).
+
 ### Gestión de clientes (CRUD completo)
 - Crear, ver, **editar**, **eliminar** (soft-delete) y **reactivar** clientes desde la lista.
 - Filtro **Activos / Inactivos** y búsqueda por nombre/cédula.
@@ -246,6 +265,13 @@ proyecto es Vanilla por diseño).
   PERITAJE/COTIZACIÓN), **eliminar** (soft-delete, reversible) y **reactivar**, todo
   desde el listado con confirmaciones y estados de carga/vacío/error.
 - Respeta la state machine: las órdenes en CANCELADO/ENTREGADO no se editan.
+- **Borrado en dos pasos**: "Eliminar" **archiva** (soft-delete, reversible); desde el
+  filtro **Inactivas** se puede **Eliminar definitivamente** (hard-delete) una orden ya
+  archivada, borrando en cascada su cotización, factura, pagos y fases (irreversible).
+- **Precios en pesos colombianos**: los montos se ingresan en **enteros** (sin centavos)
+  con **vista previa en vivo** del valor formateado en COP; al registrar un área dañada
+  se ve el **subtotal** (precio × cantidad) y al registrar un pago el monto se
+  **pre-llena con el saldo** (atajo "pagar saldo completo") y se valida que no lo supere.
 
 ### Facturación y PDF
 - Emisión de factura (adelanto 50%) y registro de pagos.
@@ -272,8 +298,6 @@ proyecto es Vanilla por diseño).
 > 📌 El **control vivo de pendientes** se gestiona en [`MEMORY.md`](MEMORY.md): es la
 > fuente única de lo que falta. Al completar un punto se marca y se elimina de allí, y
 > se actualizan este README y `CLAUDE.md` si cambian hechos del proyecto.
-
-_Sin pendientes abiertos actualmente — el control vivo está en [`MEMORY.md`](MEMORY.md)._
 
 ---
 

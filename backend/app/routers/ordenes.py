@@ -70,6 +70,15 @@ def eliminar_orden(
     orden_service.eliminar_orden(db, orden_id)
 
 
+@router.delete("/{orden_id}/permanente", status_code=status.HTTP_204_NO_CONTENT)
+def eliminar_orden_permanente(
+    orden_id: int,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(get_current_user),
+):
+    orden_service.eliminar_orden_permanente(db, orden_id)
+
+
 @router.patch("/{orden_id}/activar", response_model=OrdenDetalleResponse)
 def activar_orden(
     orden_id: int,

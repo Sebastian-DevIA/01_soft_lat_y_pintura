@@ -57,6 +57,13 @@ export const api = {
   },
   me: () => request('GET', '/api/v1/auth/me'),
 
+  // Usuarios (solo admin)
+  usuarios: {
+    list:   () => request('GET', '/api/v1/usuarios/'),
+    create: (data) => request('POST', '/api/v1/usuarios/', data),
+    update: (id, data) => request('PATCH', `/api/v1/usuarios/${id}`, data),
+  },
+
   // Clientes
   clientes: {
     list:   (params = '') => request('GET', `/api/v1/clientes/${params}`),
@@ -83,6 +90,7 @@ export const api = {
     create:    (data)  => request('POST', '/api/v1/ordenes/', data),
     update:    (id, data) => request('PUT', `/api/v1/ordenes/${id}`, data),
     eliminar:  (id)   => request('DELETE', `/api/v1/ordenes/${id}`),
+    eliminarPermanente: (id) => request('DELETE', `/api/v1/ordenes/${id}/permanente`),
     activar:   (id)   => request('PATCH', `/api/v1/ordenes/${id}/activar`),
     cambiarEstado: (id, estado, notas = null) => request('PATCH', `/api/v1/ordenes/${id}/estado`, { estado, notas }),
     aprobar:   (id)   => request('PATCH', `/api/v1/ordenes/${id}/aprobar`),

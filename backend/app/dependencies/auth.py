@@ -29,3 +29,13 @@ def get_current_user(
     if user is None or not user.is_active:
         raise credentials_exception
     return user
+
+
+def get_current_admin(current_user: Usuario = Depends(get_current_user)) -> Usuario:
+    """Exige que el usuario autenticado sea administrador (gestión de usuarios)."""
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Se requieren privilegios de administrador",
+        )
+    return current_user

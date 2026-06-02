@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.routers import (
     auth,
+    usuarios,
     clientes,
     vehiculos,
     ordenes,
@@ -30,6 +31,7 @@ app.add_middleware(
 )
 
 app.include_router(auth.router)
+app.include_router(usuarios.router)
 app.include_router(clientes.router)
 app.include_router(vehiculos.router)
 app.include_router(ordenes.router)
