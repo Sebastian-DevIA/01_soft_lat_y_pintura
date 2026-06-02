@@ -1,5 +1,5 @@
 import { api } from '../api.js';
-import { formatCurrency, formatDate, stateBadge, toast, renderLoader, renderError, showModal, confirmDialog, showPdfViewer, escapeHtml } from '../utils.js';
+import { formatCurrency, formatDate, stateBadge, toast, renderLoader, renderError, renderEmpty, showModal, confirmDialog, showPdfViewer, escapeHtml } from '../utils.js';
 import { createCarDiagram } from '../components/CarDiagram.js';
 
 // State machine (debe reflejar TRANSICIONES_VALIDAS del backend)
@@ -11,6 +11,15 @@ const TRANSICIONES_VALIDAS = {
   ENTREGADO:  [],
   CANCELADO:  [],
 };
+
+// El vehículo solo puede reasignarse mientras la orden está en peritaje o cotización.
+const ESTADOS_REASIGNA_VEHICULO = ['PERITAJE', 'COTIZACION'];
+// Estados terminales: el backend bloquea cualquier edición (409).
+const ESTADOS_NO_EDITABLES = ['CANCELADO', 'ENTREGADO'];
+
+// Estado de los filtros de la lista (módulo).
+let _verActivas = true;      // true = órdenes activas, false = inactivas (historial)
+let _filtroEstado = '';      // '' = todos los estados
 
 // Etiqueta legible del vehículo a partir de campos enriquecidos (con fallback seguro).
 function vehiculoLabel(o) {
@@ -34,53 +43,215 @@ export const ordenes = {
   }
 };
 
+// Construye el query string a partir de los filtros de módulo (activo + estado).
+function _queryListado() {
+  const params = new URLSearchParams();
+  params.set('activo', String(_verActivas));
+  if (_filtroEstado) params.set('estado', _filtroEstado);
+  return `?${params.toString()}`;
+}
+
 async function renderLista(container) {
   container.innerHTML = renderLoader();
   try {
-    const data = await api.ordenes.list();
+    const data = await api.ordenes.list(_queryListado());
+    const opciones = ['PERITAJE', 'COTIZACION', 'APROBACION', 'EN_PROCESO', 'ENTREGADO', 'CANCELADO']
+      .map(e => `<option value="${e}" ${_filtroEstado === e ? 'selected' : ''}>${e.replace('_', ' ')}</option>`)
+      .join('');
     container.innerHTML = `
       <div class="flex justify-between align-center mb-2">
         <h2>Órdenes de Trabajo</h2>
         <a class="btn btn-primary" href="#/ordenes/nueva">+ Nueva Orden</a>
       </div>
-      <div class="search-bar">
-        <select class="form-control" id="filtro-estado" style="max-width:200px">
-          <option value="">Todos los estados</option>
-          <option>PERITAJE</option><option>COTIZACION</option><option>APROBACION</option>
-          <option>EN_PROCESO</option><option>ENTREGADO</option><option>CANCELADO</option>
-        </select>
+      <div class="toolbar mb-2">
+        <div class="search-bar">
+          <select class="form-control" id="filtro-estado" style="max-width:220px" aria-label="Filtrar por estado">
+            <option value="">Todos los estados</option>
+            ${opciones}
+          </select>
+        </div>
+        <div class="segmented" role="tablist" aria-label="Filtrar por actividad">
+          <button class="seg-btn ${_verActivas ? 'active' : ''}" id="seg-activas" role="tab" aria-selected="${_verActivas}">Activas</button>
+          <button class="seg-btn ${!_verActivas ? 'active' : ''}" id="seg-inactivas" role="tab" aria-selected="${!_verActivas}">Inactivas</button>
+        </div>
       </div>
       <div class="card">
         <div class="table-wrapper">
           <table class="data-table">
-            <thead><tr><th>ID</th><th>Vehículo</th><th>Cliente</th><th>Estado</th><th>Total</th><th>Ingreso</th><th></th></tr></thead>
+            <thead><tr><th>ID</th><th>Vehículo</th><th>Cliente</th><th>Estado</th><th class="text-right">Total</th><th>Ingreso</th><th>Acciones</th></tr></thead>
             <tbody id="tbody-ordenes">${renderFilasOrdenes(data)}</tbody>
           </table>
         </div>
       </div>`;
 
-    container.querySelector('#filtro-estado').onchange = async (e) => {
-      const estado = e.target.value;
-      const res = await api.ordenes.list(estado ? `?estado=${estado}` : '');
-      container.querySelector('#tbody-ordenes').innerHTML = renderFilasOrdenes(res);
+    container.querySelector('#filtro-estado').onchange = (e) => {
+      _filtroEstado = e.target.value;
+      renderLista(container);
     };
+    container.querySelector('#seg-activas').onclick = () => { _verActivas = true; renderLista(container); };
+    container.querySelector('#seg-inactivas').onclick = () => { _verActivas = false; renderLista(container); };
+    attachRowEvents(container);
   } catch (err) {
     container.innerHTML = renderError(err.message);
   }
 }
 
 function renderFilasOrdenes(lista) {
-  if (!lista.length) return '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--color-muted)">Sin órdenes</td></tr>';
-  return lista.map(o => `
+  if (!lista.length) {
+    const msg = _verActivas
+      ? (_filtroEstado ? `Sin órdenes activas en estado ${_filtroEstado.replace('_', ' ')}.` : 'Sin órdenes activas. Crea la primera.')
+      : 'No hay órdenes inactivas en el historial.';
+    return `<tr><td colspan="7">${renderEmpty(msg, '🧾')}</td></tr>`;
+  }
+  return lista.map(o => {
+    const editable = !ESTADOS_NO_EDITABLES.includes(o.estado);
+    const acciones = [
+      `<a class="btn btn-outline btn-sm" href="#/ordenes/${o.id}">Ver</a>`,
+      editable
+        ? `<button class="btn btn-outline btn-sm" data-id="${o.id}" data-action="editar" aria-label="Editar orden #${o.id}">Editar</button>`
+        : `<button class="btn btn-outline btn-sm" disabled title="Las órdenes ${o.estado.toLowerCase()} no se pueden editar" aria-label="Edición no disponible">Editar</button>`,
+      _verActivas
+        ? `<button class="btn btn-danger btn-sm" data-id="${o.id}" data-action="eliminar" aria-label="Eliminar orden #${o.id}">Eliminar</button>`
+        : `<button class="btn btn-success btn-sm" data-id="${o.id}" data-action="reactivar" aria-label="Reactivar orden #${o.id}">Reactivar</button>`,
+    ].join('');
+    return `
     <tr>
       <td><strong>#${o.id}</strong></td>
       <td>${escapeHtml(vehiculoLabel(o))}</td>
       <td>${escapeHtml(o.cliente_nombre || '—')}</td>
       <td>${stateBadge(o.estado)}</td>
-      <td>${formatCurrency(o.total_con_descuento)}</td>
+      <td class="text-right">${formatCurrency(o.total_con_descuento)}</td>
       <td>${formatDate(o.fecha_ingreso)}</td>
-      <td><a class="btn btn-outline btn-sm" href="#/ordenes/${o.id}">Ver detalle</a></td>
-    </tr>`).join('');
+      <td class="flex gap-1">${acciones}</td>
+    </tr>`;
+  }).join('');
+}
+
+function attachRowEvents(container) {
+  container.querySelectorAll('[data-action="editar"]').forEach(btn => {
+    btn.onclick = async () => {
+      try {
+        const orden = await api.ordenes.get(btn.dataset.id);
+        _formularioEditarOrden(orden, () => renderLista(container));
+      } catch (err) { toast(err.message, 'error'); }
+    };
+  });
+  container.querySelectorAll('[data-action="eliminar"]').forEach(btn => {
+    btn.onclick = async () => {
+      const ok = await confirmDialog({
+        title: 'Eliminar orden',
+        message: `La orden #${btn.dataset.id} saldrá del historial activo (no se borra: se conserva y puedes reactivarla luego). ¿Continuar?`,
+        confirmText: 'Eliminar',
+        confirmClass: 'btn-danger',
+      });
+      if (!ok) return;
+      try {
+        await api.ordenes.eliminar(btn.dataset.id);
+        toast('Orden archivada', 'success');
+        renderLista(container);
+      } catch (err) { toast(err.message, 'error'); }
+    };
+  });
+  container.querySelectorAll('[data-action="reactivar"]').forEach(btn => {
+    btn.onclick = async () => {
+      try {
+        await api.ordenes.activar(btn.dataset.id);
+        toast('Orden reactivada', 'success');
+        renderLista(container);
+      } catch (err) { toast(err.message, 'error'); }
+    };
+  });
+}
+
+// Convierte un ISO (o null) al formato que espera <input type="datetime-local"> (YYYY-MM-DDTHH:mm).
+function _isoADatetimeLocal(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+// Formulario de edición de la orden (observaciones, fecha estimada, vehículo).
+// Envío PARCIAL: solo se mandan los campos editados/permitidos por el estado.
+function _formularioEditarOrden(orden, onSuccess) {
+  const puedeReasignar = ESTADOS_REASIGNA_VEHICULO.includes(orden.estado);
+  const overlay = showModal({
+    title: `Editar Orden #${orden.id}`,
+    body: `
+      <div class="form-group">
+        <label for="o-obs">Observaciones</label>
+        <textarea class="form-control" id="o-obs" rows="3" placeholder="Notas del peritaje, daños, comentarios...">${escapeHtml(orden.observaciones || '')}</textarea>
+      </div>
+      <div class="form-group">
+        <label for="o-fecha">Fecha estimada de entrega</label>
+        <input class="form-control" id="o-fecha" type="datetime-local" value="${escapeHtml(_isoADatetimeLocal(orden.fecha_estimada_entrega))}" />
+      </div>
+      <div class="form-group">
+        <label for="o-vehiculo">Vehículo</label>
+        <select class="form-control" id="o-vehiculo" ${puedeReasignar ? '' : 'disabled'} aria-describedby="${puedeReasignar ? '' : 'o-vehiculo-nota'}">
+          <option value="${orden.vehiculo_id}">${escapeHtml(vehiculoLabel(orden))}</option>
+        </select>
+        ${puedeReasignar
+          ? ''
+          : `<p class="form-error" id="o-vehiculo-nota" style="color:var(--color-muted)">El vehículo solo se reasigna en peritaje/cotización.</p>`}
+      </div>`,
+    confirmText: 'Guardar',
+    onConfirm: async (ov) => {
+      const obs = ov.querySelector('#o-obs').value.trim();
+      const fechaLocal = ov.querySelector('#o-fecha').value;
+      const body = { observaciones: obs || null };
+
+      if (fechaLocal) {
+        const d = new Date(fechaLocal);
+        if (Number.isNaN(d.getTime())) {
+          toast('La fecha estimada de entrega no es válida', 'error');
+          return false;
+        }
+        // datetime-local no lleva zona: enviar ISO local sin sufijo Z (igual al ejemplo del backend).
+        body.fecha_estimada_entrega = `${fechaLocal}:00`;
+      } else {
+        body.fecha_estimada_entrega = null;
+      }
+
+      // vehiculo_id solo si el estado permite reasignación (evita el 409 del backend).
+      if (puedeReasignar) {
+        const sel = ov.querySelector('#o-vehiculo');
+        const nuevoId = parseInt(sel.value, 10);
+        if (Number.isInteger(nuevoId) && nuevoId !== orden.vehiculo_id) {
+          body.vehiculo_id = nuevoId;
+        }
+      }
+
+      try {
+        await api.ordenes.update(orden.id, body);
+        toast('Orden actualizada', 'success');
+        if (onSuccess) onSuccess();
+      } catch (err) {
+        toast(err.message, 'error');
+        return false;
+      }
+    }
+  });
+
+  // Poblar el select de vehículos solo cuando se puede reasignar (lista de activos).
+  if (puedeReasignar) {
+    const sel = overlay.querySelector('#o-vehiculo');
+    api.vehiculos.list('?activo=true').then((vehiculos) => {
+      if (!sel) return;
+      const opts = vehiculos.map(v => {
+        const label = `${v.placa} — ${v.marca} ${v.modelo}`;
+        const selected = v.id === orden.vehiculo_id ? 'selected' : '';
+        return `<option value="${v.id}" ${selected}>${escapeHtml(label)}</option>`;
+      }).join('');
+      // Si el vehículo actual no está en la lista de activos, conservarlo como primera opción.
+      const actualPresente = vehiculos.some(v => v.id === orden.vehiculo_id);
+      sel.innerHTML = (actualPresente ? '' : `<option value="${orden.vehiculo_id}" selected>${escapeHtml(vehiculoLabel(orden))}</option>`) + opts;
+    }).catch(() => {
+      // Si falla la carga, se queda la opción actual (ya renderizada); avisar discretamente.
+      toast('No se pudieron cargar los vehículos para reasignar', 'error');
+    });
+  }
 }
 
 // ── Asistente: Nueva Orden ─────────────────────────────────────────────────

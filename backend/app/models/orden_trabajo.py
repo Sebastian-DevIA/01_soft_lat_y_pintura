@@ -52,6 +52,7 @@ class OrdenTrabajo(Base):
     aprobado_por_cliente: Mapped[bool] = mapped_column(
         Boolean, default=False, nullable=False
     )
+    activo: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     fecha_aprobacion: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     fecha_ingreso: Mapped[datetime] = mapped_column(
         server_default=func.now(), nullable=False

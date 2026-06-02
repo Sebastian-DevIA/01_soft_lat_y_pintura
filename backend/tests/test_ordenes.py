@@ -100,6 +100,129 @@ def test_orden_response_enriquecida(client, auth_headers, orden_base):
     assert detalle["cliente_nombre"] == esperado_cliente
 
 
+def _llevar_a_en_proceso(client, auth_headers, orden_id):
+    """Avanza la orden por la state machine: PERITAJE → ... → EN_PROCESO."""
+    client.post(f"/api/v1/ordenes/{orden_id}/items", json=ITEM, headers=auth_headers)
+    client.patch(f"/api/v1/ordenes/{orden_id}/aprobar", headers=auth_headers)
+    client.patch(
+        f"/api/v1/ordenes/{orden_id}/estado",
+        json={"estado": "EN_PROCESO"},
+        headers=auth_headers,
+    )
+
+
+def test_actualizar_orden_observaciones_y_fecha(client, auth_headers, orden_base):
+    orden, _, _ = orden_base
+    payload = {
+        "observaciones": "Cliente prefiere recoger por la tarde",
+        "fecha_estimada_entrega": "2026-07-15T17:00:00",
+    }
+    resp = client.put(f"/api/v1/ordenes/{orden['id']}", json=payload, headers=auth_headers)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["observaciones"] == "Cliente prefiere recoger por la tarde"
+    assert body["fecha_estimada_entrega"].startswith("2026-07-15T17:00:00")
+    # los campos planos siguen poblándose tras pasar por el helper de response
+    assert body["vehiculo_placa"] is not None
+
+
+def test_actualizar_orden_cancelada_da_409(client, auth_headers, orden_base):
+    orden, _, _ = orden_base
+    client.patch(
+        f"/api/v1/ordenes/{orden['id']}/estado",
+        json={"estado": "CANCELADO"},
+        headers=auth_headers,
+    )
+    resp = client.put(
+        f"/api/v1/ordenes/{orden['id']}",
+        json={"observaciones": "no debería entrar"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 409
+
+
+def test_actualizar_orden_entregada_da_409(client, auth_headers, orden_base):
+    orden, _, _ = orden_base
+    _llevar_a_en_proceso(client, auth_headers, orden["id"])
+    client.patch(
+        f"/api/v1/ordenes/{orden['id']}/estado",
+        json={"estado": "ENTREGADO"},
+        headers=auth_headers,
+    )
+    resp = client.put(
+        f"/api/v1/ordenes/{orden['id']}",
+        json={"observaciones": "no debería entrar"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 409
+
+
+def test_reasignar_vehiculo_en_peritaje(client, auth_headers, orden_base):
+    orden, _, cliente = orden_base
+    otro = client.post(
+        "/api/v1/vehiculos/",
+        json={"placa": "TEST02", "marca": "Mazda", "modelo": "3", "cliente_id": cliente["id"]},
+        headers=auth_headers,
+    ).json()
+    resp = client.put(
+        f"/api/v1/ordenes/{orden['id']}",
+        json={"vehiculo_id": otro["id"]},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["vehiculo_id"] == otro["id"]
+    assert body["vehiculo_placa"] == "TEST02"
+
+
+def test_reasignar_vehiculo_en_estado_posterior_da_409(client, auth_headers, orden_base):
+    orden, _, cliente = orden_base
+    otro = client.post(
+        "/api/v1/vehiculos/",
+        json={"placa": "TEST03", "marca": "Kia", "modelo": "Rio", "cliente_id": cliente["id"]},
+        headers=auth_headers,
+    ).json()
+    _llevar_a_en_proceso(client, auth_headers, orden["id"])
+    resp = client.put(
+        f"/api/v1/ordenes/{orden['id']}",
+        json={"vehiculo_id": otro["id"]},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 409
+
+
+def test_reasignar_vehiculo_inexistente_da_404(client, auth_headers, orden_base):
+    orden, _, _ = orden_base
+    resp = client.put(
+        f"/api/v1/ordenes/{orden['id']}",
+        json={"vehiculo_id": 999999},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 404
+
+
+def test_eliminar_orden_soft_delete(client, auth_headers, orden_base):
+    orden, _, _ = orden_base
+    resp = client.delete(f"/api/v1/ordenes/{orden['id']}", headers=auth_headers)
+    assert resp.status_code == 204
+    # por defecto (activo=True) ya no aparece en el listado
+    activas = client.get("/api/v1/ordenes/", headers=auth_headers).json()
+    assert all(o["id"] != orden["id"] for o in activas)
+    # con ?activo=false sí aparece
+    inactivas = client.get("/api/v1/ordenes/?activo=false", headers=auth_headers).json()
+    assert any(o["id"] == orden["id"] for o in inactivas)
+
+
+def test_activar_orden_tras_soft_delete(client, auth_headers, orden_base):
+    orden, _, _ = orden_base
+    client.delete(f"/api/v1/ordenes/{orden['id']}", headers=auth_headers)
+    resp = client.patch(f"/api/v1/ordenes/{orden['id']}/activar", headers=auth_headers)
+    assert resp.status_code == 200
+    # vuelve a estar activa: aparece en el listado por defecto
+    activas = client.get("/api/v1/ordenes/", headers=auth_headers).json()
+    assert any(o["id"] == orden["id"] for o in activas)
+
+
 def test_asignacion_personal_nombre_en_fases(client, auth_headers, orden_base):
     orden, _, _ = orden_base
     client.post(f"/api/v1/ordenes/{orden['id']}/items", json=ITEM, headers=auth_headers)
@@ -120,3 +243,278 @@ def test_asignacion_personal_nombre_en_fases(client, auth_headers, orden_base):
     fases2 = client.get(f"/api/v1/fases/orden/{orden['id']}", headers=auth_headers).json()
     fase = next(f for f in fases2 if f["id"] == fase_id)
     assert fase["asignaciones"][0]["personal_nombre"] == "Carlos Méndez"
+
+
+# ── Edge cases añadidos ────────────────────────────────────────────────────────
+
+
+def test_put_body_vacio_no_cambia_nada(client, auth_headers, orden_base):
+    """PUT con body vacío {} no cambia nada y devuelve 200."""
+    orden, vehiculo, cliente = orden_base
+    resp = client.put(f"/api/v1/ordenes/{orden['id']}", json={}, headers=auth_headers)
+    assert resp.status_code == 200
+    body = resp.json()
+    # Los valores no cambiaron
+    assert body["observaciones"] is None
+    assert body["vehiculo_id"] == orden["vehiculo_id"]
+    # Los campos planos siguen poblados
+    assert body["vehiculo_placa"] == vehiculo["placa"]
+    assert body["cliente_nombre"] == f"{cliente['nombre']} {cliente['apellido']}"
+
+
+def test_put_observaciones_null_limpia_campo(client, auth_headers, orden_base):
+    """PUT con observaciones: null limpia el campo (lo pone en None)."""
+    orden, _, _ = orden_base
+    # Primero ponemos un valor
+    client.put(
+        f"/api/v1/ordenes/{orden['id']}",
+        json={"observaciones": "texto inicial"},
+        headers=auth_headers,
+    )
+    # Ahora lo borramos enviando null explícitamente
+    resp = client.put(
+        f"/api/v1/ordenes/{orden['id']}",
+        json={"observaciones": None},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    assert resp.json()["observaciones"] is None
+
+
+def test_put_orden_inexistente_da_404(client, auth_headers):
+    """PUT en una orden que no existe devuelve 404."""
+    resp = client.put(
+        "/api/v1/ordenes/999999",
+        json={"observaciones": "x"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 404
+
+
+def test_activar_orden_inexistente_da_404(client, auth_headers):
+    """PATCH /activar en orden inexistente devuelve 404."""
+    resp = client.patch("/api/v1/ordenes/999999/activar", headers=auth_headers)
+    assert resp.status_code == 404
+
+
+def test_activar_alterna_ida_y_vuelta(client, auth_headers, orden_base):
+    """PATCH /activar alterna activo: True→False→True."""
+    orden, _, _ = orden_base
+    # Primera llamada: desactiva (True → False)
+    r1 = client.patch(f"/api/v1/ordenes/{orden['id']}/activar", headers=auth_headers)
+    assert r1.status_code == 200
+    inactivas = client.get("/api/v1/ordenes/?activo=false", headers=auth_headers).json()
+    assert any(o["id"] == orden["id"] for o in inactivas)
+
+    # Segunda llamada: reactiva (False → True)
+    r2 = client.patch(f"/api/v1/ordenes/{orden['id']}/activar", headers=auth_headers)
+    assert r2.status_code == 200
+    activas = client.get("/api/v1/ordenes/", headers=auth_headers).json()
+    assert any(o["id"] == orden["id"] for o in activas)
+
+
+def test_delete_orden_inexistente_da_404(client, auth_headers):
+    """DELETE en orden inexistente devuelve 404."""
+    resp = client.delete("/api/v1/ordenes/999999", headers=auth_headers)
+    assert resp.status_code == 404
+
+
+def test_filtro_combinado_estado_y_activo(client, auth_headers, orden_base):
+    """GET con ?estado=PERITAJE&activo=true devuelve solo las órdenes que coinciden."""
+    orden, _, _ = orden_base
+    # La orden_base está en PERITAJE y activo=True
+    resp = client.get(
+        "/api/v1/ordenes/?estado=PERITAJE&activo=true", headers=auth_headers
+    )
+    assert resp.status_code == 200
+    ids = [o["id"] for o in resp.json()]
+    assert orden["id"] in ids
+    # Todos los resultados deben tener estado PERITAJE
+    assert all(o["estado"] == "PERITAJE" for o in resp.json())
+
+    # Con otro estado no debe aparecer
+    resp2 = client.get(
+        "/api/v1/ordenes/?estado=CANCELADO&activo=true", headers=auth_headers
+    )
+    assert resp2.status_code == 200
+    ids2 = [o["id"] for o in resp2.json()]
+    assert orden["id"] not in ids2
+
+
+def test_delete_soft_no_elimina_fases_ni_factura(client, auth_headers, orden_base):
+    """Soft-delete NO borra en cascada facturas ni fases (solo marca activo=False)."""
+    orden, _, _ = orden_base
+    # Llegar a APROBACION para que se creen fases
+    client.post(f"/api/v1/ordenes/{orden['id']}/items", json=ITEM, headers=auth_headers)
+    client.patch(f"/api/v1/ordenes/{orden['id']}/aprobar", headers=auth_headers)
+    # Emitir factura (avanza la orden a EN_PROCESO)
+    factura = client.post(
+        "/api/v1/facturas/",
+        json={"orden_id": orden["id"]},
+        headers=auth_headers,
+    ).json()
+    # Soft-delete la orden
+    resp_del = client.delete(
+        f"/api/v1/ordenes/{orden['id']}", headers=auth_headers
+    )
+    assert resp_del.status_code == 204
+
+    # La factura sigue accesible
+    resp_fac = client.get(
+        f"/api/v1/facturas/{factura['id']}", headers=auth_headers
+    )
+    assert resp_fac.status_code == 200
+    assert resp_fac.json()["id"] == factura["id"]
+
+    # Las fases de la orden siguen accesibles
+    resp_fases = client.get(
+        f"/api/v1/fases/orden/{orden['id']}", headers=auth_headers
+    )
+    assert resp_fases.status_code == 200
+    assert len(resp_fases.json()) == 3  # INGRESO, REPARACION, ENTREGA
+
+
+def test_aprobar_orden_en_estado_aprobacion_da_422(client, auth_headers, orden_base):
+    """Aprobar una orden ya en APROBACION (no en COTIZACION) devuelve 422."""
+    orden, _, _ = orden_base
+    client.post(f"/api/v1/ordenes/{orden['id']}/items", json=ITEM, headers=auth_headers)
+    client.patch(f"/api/v1/ordenes/{orden['id']}/aprobar", headers=auth_headers)
+    # Intentar aprobar de nuevo (ya está en APROBACION)
+    resp = client.patch(
+        f"/api/v1/ordenes/{orden['id']}/aprobar", headers=auth_headers
+    )
+    assert resp.status_code == 422
+
+
+def test_descuento_en_estado_aprobacion_da_422(client, auth_headers, orden_base):
+    """Aplicar descuento cuando la orden está en APROBACION devuelve 422."""
+    orden, _, _ = orden_base
+    client.post(f"/api/v1/ordenes/{orden['id']}/items", json=ITEM, headers=auth_headers)
+    client.patch(f"/api/v1/ordenes/{orden['id']}/aprobar", headers=auth_headers)
+    resp = client.patch(
+        f"/api/v1/ordenes/{orden['id']}/descuento",
+        json={"descuento_porcentaje": 5},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 422
+
+
+def test_agregar_item_en_estado_aprobacion_da_422(client, auth_headers, orden_base):
+    """Agregar ítem cuando la orden está en APROBACION devuelve 422."""
+    orden, _, _ = orden_base
+    client.post(f"/api/v1/ordenes/{orden['id']}/items", json=ITEM, headers=auth_headers)
+    client.patch(f"/api/v1/ordenes/{orden['id']}/aprobar", headers=auth_headers)
+    resp = client.post(
+        f"/api/v1/ordenes/{orden['id']}/items",
+        json=ITEM,
+        headers=auth_headers,
+    )
+    assert resp.status_code == 422
+
+
+def test_actualizar_item_exitoso(client, auth_headers, orden_base):
+    """PUT /ordenes/{id}/items/{item_id} actualiza descripcion y precio correctamente."""
+    orden, _, _ = orden_base
+    item = client.post(
+        f"/api/v1/ordenes/{orden['id']}/items", json=ITEM, headers=auth_headers
+    ).json()
+    nuevo = {
+        "descripcion": "Latonear capó",
+        "area_vehiculo": "Capó",
+        "precio_unitario": 200.0,
+        "cantidad": 2,
+    }
+    resp = client.put(
+        f"/api/v1/ordenes/{orden['id']}/items/{item['id']}",
+        json=nuevo,
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["descripcion"] == "Latonear capó"
+    assert body["precio_unitario"] == 200.0
+    assert body["cantidad"] == 2
+    assert body["subtotal"] == 400.0
+
+    # El total de la orden también se recalcula
+    detalle = client.get(f"/api/v1/ordenes/{orden['id']}", headers=auth_headers).json()
+    assert detalle["total_cotizado"] == 400.0
+
+
+def test_actualizar_item_inexistente_da_404(client, auth_headers, orden_base):
+    """PUT /ordenes/{id}/items/{item_id} con ítem que no existe devuelve 404."""
+    orden, _, _ = orden_base
+    resp = client.put(
+        f"/api/v1/ordenes/{orden['id']}/items/999999",
+        json=ITEM,
+        headers=auth_headers,
+    )
+    assert resp.status_code == 404
+
+
+def test_eliminar_item_inexistente_da_404(client, auth_headers, orden_base):
+    """DELETE /ordenes/{id}/items/{item_id} con ítem inexistente devuelve 404."""
+    orden, _, _ = orden_base
+    resp = client.delete(
+        f"/api/v1/ordenes/{orden['id']}/items/999999", headers=auth_headers
+    )
+    assert resp.status_code == 404
+
+
+def test_reasignar_vehiculo_en_cotizacion(client, auth_headers, orden_base):
+    """Reasignar vehículo en estado COTIZACION también está permitido (409 solo >COTIZACION)."""
+    orden, _, cliente = orden_base
+    # Avanzar a COTIZACION agregando un ítem
+    client.post(f"/api/v1/ordenes/{orden['id']}/items", json=ITEM, headers=auth_headers)
+    detalle = client.get(f"/api/v1/ordenes/{orden['id']}", headers=auth_headers).json()
+    assert detalle["estado"] == "COTIZACION"
+
+    otro = client.post(
+        "/api/v1/vehiculos/",
+        json={"placa": "TEST04", "marca": "Honda", "modelo": "Civic", "cliente_id": cliente["id"]},
+        headers=auth_headers,
+    ).json()
+    resp = client.put(
+        f"/api/v1/ordenes/{orden['id']}",
+        json={"vehiculo_id": otro["id"]},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    assert resp.json()["vehiculo_id"] == otro["id"]
+    assert resp.json()["vehiculo_placa"] == "TEST04"
+
+
+def test_aprobar_con_total_cero_en_cotizacion_da_422(client, auth_headers, orden_base):
+    """Aprobar cuando el total_con_descuento es 0 (ítem con precio 0 no es posible por validación,
+    pero si se aplica descuento 100% el total queda en 0) devuelve 422."""
+    orden, _, _ = orden_base
+    # Agregar ítem y aplicar descuento del 100%
+    client.post(f"/api/v1/ordenes/{orden['id']}/items", json=ITEM, headers=auth_headers)
+    client.patch(
+        f"/api/v1/ordenes/{orden['id']}/descuento",
+        json={"descuento_porcentaje": 100},
+        headers=auth_headers,
+    )
+    detalle = client.get(f"/api/v1/ordenes/{orden['id']}", headers=auth_headers).json()
+    assert detalle["estado"] == "COTIZACION"
+    assert detalle["total_con_descuento"] == 0.0
+
+    resp = client.patch(
+        f"/api/v1/ordenes/{orden['id']}/aprobar", headers=auth_headers
+    )
+    assert resp.status_code == 422
+
+
+def test_put_campos_planos_poblados_tras_edicion(client, auth_headers, orden_base):
+    """Los campos vehiculo_placa y cliente_nombre vienen poblados en la respuesta de PUT."""
+    orden, vehiculo, cliente = orden_base
+    resp = client.put(
+        f"/api/v1/ordenes/{orden['id']}",
+        json={"observaciones": "revisar pintura"},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["vehiculo_placa"] == vehiculo["placa"]
+    assert body["vehiculo_descripcion"] is not None
+    assert body["cliente_nombre"] == f"{cliente['nombre']} {cliente['apellido']}"

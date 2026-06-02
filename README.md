@@ -4,7 +4,7 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688?logo=fastapi)
 ![SQLite](https://img.shields.io/badge/SQLite-3-003B57?logo=sqlite)
 ![License](https://img.shields.io/badge/License-MIT-green)
-![Tests](https://img.shields.io/badge/Tests-29%2F29-brightgreen)
+![Tests](https://img.shields.io/badge/Tests-94%2F94-brightgreen)
 
 Sistema de gestión operacional para un taller de latonería y pintura automotriz. Cubre el ciclo completo del vehículo: ingreso, peritaje, cotización, aprobación, facturación, fases de trabajo y entrega.
 
@@ -83,7 +83,7 @@ en `:8080`). El paso a paso está en [Cómo correr el proyecto](#cómo-correr-el
 │   │   └── utils/               ← hash_password, verify_password
 │   ├── templates/
 │   │   └── factura_pdf.html     ← plantilla Jinja2 para PDF
-│   ├── tests/                   ← 29 tests con SQLite en memoria
+│   ├── tests/                   ← 94 tests con SQLite en memoria
 │   ├── scripts/
 │   │   ├── create_admin.py      ← crea usuario admin inicial
 │   │   └── seed_db.py           ← datos de demo (3 clientes, 3 vehículos)
@@ -154,9 +154,12 @@ PERITAJE → COTIZACION → APROBACION → EN_PROCESO → ENTREGADO
 | GET    | `/api/v1/vehiculos/{id}`          | Obtener vehículo                   |
 | PUT    | `/api/v1/vehiculos/{id}`          | Actualizar vehículo                |
 | DELETE | `/api/v1/vehiculos/{id}`          | Desactivar vehículo (soft-delete)  |
-| GET    | `/api/v1/ordenes/`                | Listar órdenes (filtro por estado) |
+| GET    | `/api/v1/ordenes/`                | Listar órdenes (filtro por estado y activo) |
 | POST   | `/api/v1/ordenes/`                | Crear orden                        |
 | GET    | `/api/v1/ordenes/{id}`            | Detalle completo (con factura)     |
+| PUT    | `/api/v1/ordenes/{id}`            | Editar orden (observaciones/fecha/vehículo) |
+| DELETE | `/api/v1/ordenes/{id}`            | Eliminar orden (soft-delete)       |
+| PATCH  | `/api/v1/ordenes/{id}/activar`    | Reactivar / alternar orden         |
 | PATCH  | `/api/v1/ordenes/{id}/estado`     | Cambiar estado (state machine / cancelar) |
 | PATCH  | `/api/v1/ordenes/{id}/aprobar`    | Aprobar cotización                 |
 | PATCH  | `/api/v1/ordenes/{id}/descuento`  | Aplicar descuento                  |
@@ -256,9 +259,8 @@ Pendientes actuales (resumen — ver detalle y estado en [`MEMORY.md`](MEMORY.md
 
 | # | Pendiente | Descripción |
 |---|-----------|-------------|
-| 1 | Mejorar el **CRUD de órdenes** | Desde el **historial/listado** de órdenes: **editar** cada orden y **eliminar** (cuando se requiera), al nivel del CRUD de clientes (validación, estados de carga/vacío/error y confirmaciones con modal). |
-| 2 | Mapa de daños en **horizontal** | El diagrama del vehículo está en vertical; dejarlo en **orientación horizontal** (vista superior apaisada). |
-| 3 | Áreas dañadas **junto al mapa** | Mostrar la visualización de las zonas dañadas **al lado** del diagrama del carro (dos columnas) para que sea más visible. |
+| 1 | Mapa de daños en **horizontal** | El diagrama del vehículo está en vertical; dejarlo en **orientación horizontal** (vista superior apaisada). |
+| 2 | Áreas dañadas **junto al mapa** | Mostrar la visualización de las zonas dañadas **al lado** del diagrama del carro (dos columnas) para que sea más visible. |
 
 ---
 
@@ -376,7 +378,7 @@ pip install -r requirements-dev.txt
 pytest backend/tests/ -v --cov=app
 ```
 
-29 tests — SQLite en memoria, sin configuración adicional.
+94 tests — SQLite en memoria, sin configuración adicional.
 
 ---
 

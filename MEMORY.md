@@ -18,12 +18,6 @@ y luego este archivo para saber qué está pendiente.
 
 ## Pendientes
 
-- [ ] **Mejorar el CRUD de órdenes** — llevarlo al nivel del CRUD de clientes.
-  Desde el **historial/listado** de órdenes (`#/ordenes`): poder **editar** cada
-  orden al estilo CRUD y **eliminar** (cuando se indique), con validación, estados
-  de carga/vacío/error y confirmaciones con `confirmDialog`.
-  · Dónde: `frontend/js/pages/ordenes.js` (+ endpoints de `ordenes` si hace falta).
-
 - [ ] **Mapa de daños en horizontal** — el `CarDiagram` está en orientación vertical;
   dejarlo **horizontal** (vista superior apaisada).
   · Dónde: `frontend/js/components/CarDiagram.js`, `frontend/css/components.css`.
@@ -37,6 +31,10 @@ y luego este archivo para saber qué está pendiente.
 
 ## Hecho recientemente
 
+- **CRUD completo de órdenes** desde el historial: editar (`PUT`), eliminar soft
+  (`DELETE`) y reactivar (`PATCH /activar`), con filtro Activas/Inactivas y edición de
+  observaciones/fecha/vehículo (reasignación solo en PERITAJE/COTIZACION). Migración
+  `0003_orden_activo` (`ordenes_trabajo.activo`). 94 tests verdes (cobertura 95%).
 - CRUD completo de clientes (editar/eliminar/reactivar, filtro activos/inactivos).
 - Visor de PDF de factura autenticado (JWT→Blob) + desglose de IVA + envío por WhatsApp.
 - Mapa de daños `CarDiagram` (SVG interactivo, 13 zonas nombradas) integrado en peritaje y orden.

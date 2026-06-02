@@ -92,8 +92,10 @@ Validación en `backend/app/services/orden_service.py`.
   (`api.facturas.pdfBlob()`); un `<a href>` plano da **401**. Jinja con `autoescape`
   (datos de cliente). El IVA es **display-only** (no toca `monto_total` ni el 50%);
   tasa en `Settings.iva_porcentaje` (default 19).
-- **Soft-delete**: `Cliente`, `Vehiculo` y `Personal` tienen flag `activo`;
-  `DELETE` desactiva (no borra) y `GET` filtra por `?activo=`.
+- **Soft-delete**: `Cliente`, `Vehiculo`, `Personal` y `OrdenTrabajo` tienen flag
+  `activo`; `DELETE` desactiva (no borra) y `GET` filtra por `?activo=`. En órdenes,
+  editar (`PUT`) está vetado en `CANCELADO`/`ENTREGADO` y el `vehiculo_id` solo se
+  reasigna en `PERITAJE`/`COTIZACION`.
 - **Esquema**: la fuente de verdad es **Alembic** (`alembic upgrade head`). Los
   scripts (`create_admin.py`/`seed_db.py`) usan `create_all`, que **no** aplica
   `ALTER` sobre tablas existentes (un `taller.db` viejo puede quedar desfasado).
@@ -115,7 +117,7 @@ backend/app/
 └── utils/           ← security.py (hash/verify password)
 backend/templates/factura_pdf.html   ← plantilla Jinja2 del PDF
 backend/tests/       ← conftest (StaticPool), test_*.py
-backend/alembic/versions/   ← 0001_initial, 0002_vehiculo_activo
+backend/alembic/versions/   ← 0001_initial, 0002_vehiculo_activo, 0003_orden_activo
 ```
 
 **No editar sin revisar impacto:** `database.py`, `models/__init__.py`, `alembic/env.py`.
