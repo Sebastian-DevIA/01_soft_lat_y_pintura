@@ -33,5 +33,4 @@ _No hay pendientes abiertos. Agrega aquí los nuevos a medida que surjan (casill
   `0003_orden_activo` (`ordenes_trabajo.activo`). 94 tests verdes (cobertura 95%).
 - CRUD completo de clientes (editar/eliminar/reactivar, filtro activos/inactivos).
 - Visor de PDF de factura autenticado (JWT→Blob) + desglose de IVA + envío por WhatsApp.
-- Mapa de daños `CarDiagram` (SVG interactivo, 13 zonas nombradas) integrado en peritaje y orden.
 - Documentación estandarizada: este `MEMORY.md` es el control de pendientes.
