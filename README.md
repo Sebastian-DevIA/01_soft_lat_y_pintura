@@ -248,11 +248,15 @@ proyecto es Vanilla por diseño).
 
 ## Pendientes (roadmap)
 
-Mejoras anotadas para una próxima iteración (**aún no implementadas**):
+> 📌 El **control vivo de pendientes** se gestiona en [`MEMORY.md`](MEMORY.md): es la
+> fuente única de lo que falta. Al completar un punto se marca y se elimina de allí, y
+> se actualizan este README y `CLAUDE.md` si cambian hechos del proyecto.
+
+Pendientes actuales (resumen — ver detalle y estado en [`MEMORY.md`](MEMORY.md)):
 
 | # | Pendiente | Descripción |
 |---|-----------|-------------|
-| 1 | Mejorar el **CRUD de órdenes** | Llevar el alta/edición/eliminación de órdenes al mismo nivel del CRUD de clientes (validación, estados de carga/vacío/error y confirmaciones con modal). |
+| 1 | Mejorar el **CRUD de órdenes** | Desde el **historial/listado** de órdenes: **editar** cada orden y **eliminar** (cuando se requiera), al nivel del CRUD de clientes (validación, estados de carga/vacío/error y confirmaciones con modal). |
 | 2 | Mapa de daños en **horizontal** | El diagrama del vehículo está en vertical; dejarlo en **orientación horizontal** (vista superior apaisada). |
 | 3 | Áreas dañadas **junto al mapa** | Mostrar la visualización de las zonas dañadas **al lado** del diagrama del carro (dos columnas) para que sea más visible. |
 
