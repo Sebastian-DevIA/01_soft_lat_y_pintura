@@ -18,19 +18,15 @@ y luego este archivo para saber qué está pendiente.
 
 ## Pendientes
 
-- [ ] **Mapa de daños en horizontal** — el `CarDiagram` está en orientación vertical;
-  dejarlo **horizontal** (vista superior apaisada).
-  · Dónde: `frontend/js/components/CarDiagram.js`, `frontend/css/components.css`.
-
-- [ ] **Áreas dañadas al lado del mapa** — mostrar la lista/visualización de zonas
-  dañadas **junto** al diagrama del carro (layout en dos columnas) para que sea más
-  visible.
-  · Dónde: `frontend/js/pages/ordenes.js`, `frontend/css/components.css`.
+_No hay pendientes abiertos. Agrega aquí los nuevos a medida que surjan (casilla `- [ ]`)._
 
 ---
 
 ## Hecho recientemente
 
+- **Mapa de daños horizontal + áreas al lado**: `CarDiagram` reorientado a apaisado
+  (frente a la izquierda, 13 zonas transpuestas, más compacto) y, en la vista de la
+  orden, layout de dos columnas con el panel de zonas dañadas junto al diagrama.
 - **CRUD completo de órdenes** desde el historial: editar (`PUT`), eliminar soft
   (`DELETE`) y reactivar (`PATCH /activar`), con filtro Activas/Inactivas y edición de
   observaciones/fecha/vehículo (reasignación solo en PERITAJE/COTIZACION). Migración

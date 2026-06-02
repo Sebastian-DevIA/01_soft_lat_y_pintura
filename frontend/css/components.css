@@ -442,7 +442,7 @@ table.data-table tbody tr:last-child td { border-bottom: none; }
   border-radius: var(--radius);
   padding: 12px;
   box-shadow: var(--glass-shadow);
-  max-width: 300px;   /* compacto y centrado, no a todo el ancho */
+  max-width: 420px;   /* compacto y centrado; proporción apaisada (~520x300) */
   margin: 0 auto;
 }
 .car-diagram svg { width: 100%; height: auto; display: block; }
@@ -478,3 +478,51 @@ table.data-table tbody tr:last-child td { border-bottom: none; }
 .car-legend i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
 .car-legend .lg-sel { background: rgba(21,101,192,.42); border: 1px solid var(--color-accent); }
 .car-legend .lg-dmg { background: rgba(198,40,40,.40); border: 1px solid var(--color-danger); }
+
+/* ── Mapa de daños en dos columnas (diagrama + panel de zonas) ──────────────
+   El diagrama es flexible; el panel toma el ancho restante. Colapsa a 1 columna. */
+.damage-map-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 440px) 1fr;
+  gap: 18px;
+  align-items: start;
+}
+.damage-map-layout .car-diagram { margin: 0; }   /* dentro del grid no se centra */
+.damage-map-side {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  box-shadow: var(--glass-shadow);
+  padding: 14px 16px;
+}
+.damage-side-title {
+  font-size: .92rem;
+  font-weight: 600;
+  color: #3a4258;
+  margin-bottom: 12px;
+}
+.damage-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.damage-list-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: .88rem;
+  line-height: 1.35;
+}
+.damage-dot {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: rgba(198,40,40,.55);
+  border: 1px solid var(--color-danger);
+}
+.damage-detail { display: block; font-size: .8rem; color: var(--color-muted); margin-top: 1px; }
+
+@media (max-width: 760px) {
+  .damage-map-layout { grid-template-columns: 1fr; }
+  .damage-map-layout .car-diagram { margin: 0 auto; }
+}

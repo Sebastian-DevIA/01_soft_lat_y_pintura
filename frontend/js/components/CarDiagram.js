@@ -1,6 +1,10 @@
 // CarDiagram — diagrama 2D interactivo (SVG inline, sin librerías) de las zonas
 // de carrocería de un vehículo, visto desde arriba. Pensado para latonería/pintura.
 //
+// Orientación HORIZONTAL (apaisada): el frente del vehículo queda a la IZQUIERDA
+// (◀ FRENTE) y el trasero a la derecha. Las zonas del lado izquierdo del coche van en
+// la FILA SUPERIOR y las del lado derecho en la FILA INFERIOR.
+//
 // Uso:
 //   const diagram = createCarDiagram({
 //     selected: 'Capó',                 // etiqueta inicial seleccionada (opcional)
@@ -14,25 +18,35 @@
 // en `item.area_vehiculo`. El `id` del path es solo estado interno del componente.
 import { escapeHtml } from '../utils.js';
 
-// Zonas de un carro normal (sedán), vista superior. Cada zona lleva:
+// Zonas de un carro normal (sedán), vista superior APAISADA. Cada zona lleva:
 //  - label: nombre completo legible (lo que se guarda en area_vehiculo y va en aria-label)
 //  - short: texto que se DIBUJA sobre la zona (todas lo tienen)
-//  - vertical: true si el texto se rota 90° (zonas laterales angostas)
+//  - vertical: true si el texto se rota -90° (franjas verticales angostas: paragolpes,
+//    capó, techo, baúl). Las aletas/puertas ahora son anchas → texto horizontal sin rotar.
 // El conjunto cubre las partes más comunes; agregar otras es OPCIONAL vía el campo de texto.
+//
+// Transposición desde el layout vertical (giro 90° horario): el eje Y antiguo
+// (frente arriba → atrás abajo) pasa a ser el eje X nuevo (frente izquierda → atrás
+// derecha); el eje X antiguo (izq↔der del coche) pasa al eje Y nuevo (lado izq → arriba,
+// lado der → abajo). viewBox apaisado 520×300, silueta ~488×188.
 const ZONES = [
-  { id: 'paragolpes-del', label: 'Paragolpes delantero',             short: 'Paragolpes del.', x: 80,  y: 22,  w: 160, h: 34, rx: 16 },
-  { id: 'aleta-del-izq',  label: 'Guardabarros delantero izquierdo', short: 'Aleta del. izq.', x: 74,  y: 64,  w: 40,  h: 88, rx: 8, vertical: true },
-  { id: 'capo',           label: 'Capó',                             short: 'Capó',            x: 120, y: 64,  w: 80,  h: 88, rx: 8 },
-  { id: 'aleta-del-der',  label: 'Guardabarros delantero derecho',   short: 'Aleta del. der.', x: 206, y: 64,  w: 40,  h: 88, rx: 8, vertical: true },
-  { id: 'puerta-del-izq', label: 'Puerta delantera izquierda',       short: 'Puerta del. izq.', x: 74,  y: 160, w: 40,  h: 96, rx: 6, vertical: true },
-  { id: 'techo',          label: 'Techo',                            short: 'Techo',           x: 120, y: 160, w: 80,  h: 200, rx: 10 },
-  { id: 'puerta-del-der', label: 'Puerta delantera derecha',         short: 'Puerta del. der.', x: 206, y: 160, w: 40,  h: 96, rx: 6, vertical: true },
-  { id: 'puerta-tra-izq', label: 'Puerta trasera izquierda',         short: 'Puerta tras. izq.', x: 74,  y: 262, w: 40,  h: 96, rx: 6, vertical: true },
-  { id: 'puerta-tra-der', label: 'Puerta trasera derecha',           short: 'Puerta tras. der.', x: 206, y: 262, w: 40,  h: 96, rx: 6, vertical: true },
-  { id: 'aleta-tra-izq',  label: 'Guardabarros trasero izquierdo',   short: 'Aleta tras. izq.', x: 74,  y: 366, w: 40,  h: 88, rx: 8, vertical: true },
-  { id: 'baul',           label: 'Baúl / Maletero',                  short: 'Baúl',            x: 120, y: 366, w: 80,  h: 88, rx: 8 },
-  { id: 'aleta-tra-der',  label: 'Guardabarros trasero derecho',     short: 'Aleta tras. der.', x: 206, y: 366, w: 40,  h: 88, rx: 8, vertical: true },
-  { id: 'paragolpes-tra', label: 'Paragolpes trasero',               short: 'Paragolpes tras.', x: 80,  y: 462, w: 160, h: 34, rx: 16 },
+  // Extremos: paragolpes (franjas verticales angostas en los bordes izq/der)
+  { id: 'paragolpes-del', label: 'Paragolpes delantero',             short: 'Paragolpes del.', x: 22,  y: 80,  w: 34,  h: 160, rx: 16, vertical: true },
+  { id: 'paragolpes-tra', label: 'Paragolpes trasero',               short: 'Paragolpes tras.', x: 462, y: 80,  w: 34,  h: 160, rx: 16, vertical: true },
+  // Centro longitudinal: capó (izq-centro) → techo (centro) → baúl (der-centro)
+  { id: 'capo',           label: 'Capó',                             short: 'Capó',            x: 64,  y: 120, w: 88,  h: 80,  rx: 8,  vertical: true },
+  { id: 'techo',          label: 'Techo',                            short: 'Techo',           x: 160, y: 120, w: 200, h: 80,  rx: 10 },
+  { id: 'baul',           label: 'Baúl / Maletero',                  short: 'Baúl',            x: 366, y: 120, w: 88,  h: 80,  rx: 8,  vertical: true },
+  // Fila SUPERIOR = lado izquierdo del coche (delante → atrás)
+  { id: 'aleta-del-izq',  label: 'Guardabarros delantero izquierdo', short: 'Aleta del. izq.', x: 64,  y: 74,  w: 88,  h: 40,  rx: 8 },
+  { id: 'puerta-del-izq', label: 'Puerta delantera izquierda',       short: 'Puerta del. izq.', x: 160, y: 74,  w: 96,  h: 40,  rx: 6 },
+  { id: 'puerta-tra-izq', label: 'Puerta trasera izquierda',         short: 'Puerta tras. izq.', x: 262, y: 74,  w: 96,  h: 40,  rx: 6 },
+  { id: 'aleta-tra-izq',  label: 'Guardabarros trasero izquierdo',   short: 'Aleta tras. izq.', x: 366, y: 74,  w: 88,  h: 40,  rx: 8 },
+  // Fila INFERIOR = lado derecho del coche (delante → atrás)
+  { id: 'aleta-del-der',  label: 'Guardabarros delantero derecho',   short: 'Aleta del. der.', x: 64,  y: 206, w: 88,  h: 40,  rx: 8 },
+  { id: 'puerta-del-der', label: 'Puerta delantera derecha',         short: 'Puerta del. der.', x: 160, y: 206, w: 96,  h: 40,  rx: 6 },
+  { id: 'puerta-tra-der', label: 'Puerta trasera derecha',           short: 'Puerta tras. der.', x: 262, y: 206, w: 96,  h: 40,  rx: 6 },
+  { id: 'aleta-tra-der',  label: 'Guardabarros trasero derecho',     short: 'Aleta tras. der.', x: 366, y: 206, w: 88,  h: 40,  rx: 8 },
 ];
 
 const norm = (s) => (s || '').toString().trim().toLowerCase();
@@ -64,18 +78,18 @@ export function createCarDiagram({ selected = null, damagedZones = [], readonly 
   }).join('');
 
   wrap.innerHTML = `
-    <svg viewBox="0 0 320 520" role="img" aria-label="Diagrama de zonas del vehículo (vista superior)">
+    <svg viewBox="0 0 520 300" role="img" aria-label="Diagrama de zonas del vehículo (vista superior, frente a la izquierda)">
       <defs>
-        <linearGradient id="carBody" x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id="carBody" x1="0" y1="0" x2="1" y2="0">
           <stop offset="0" stop-color="rgba(255,255,255,.55)"/>
           <stop offset="1" stop-color="rgba(255,255,255,.30)"/>
         </linearGradient>
       </defs>
-      <!-- silueta del cuerpo -->
-      <rect x="66" y="16" width="188" height="488" rx="46" fill="url(#carBody)"
+      <!-- silueta del cuerpo (apaisada) -->
+      <rect x="16" y="66" width="488" height="188" rx="46" fill="url(#carBody)"
             stroke="var(--glass-border)" stroke-width="1.5"/>
-      <!-- guía: frente del vehículo -->
-      <text x="160" y="13" text-anchor="middle" font-size="9" fill="var(--color-muted)">▲ FRENTE</text>
+      <!-- guía: frente del vehículo (a la izquierda) -->
+      <text x="13" y="160" text-anchor="middle" font-size="9" fill="var(--color-muted)" transform="rotate(-90 13 160)">◀ FRENTE</text>
       ${zonesSvg}
     </svg>
     <div class="car-legend">

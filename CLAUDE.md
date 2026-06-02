@@ -148,8 +148,9 @@ los tests **no** usan `taller.db`. Correr: `pytest backend/tests/ -v --cov=app`.
 - Helpers en `js/utils.js`: `renderLoader`, `renderSkeleton`, `renderEmpty`,
   `renderError` (traduce errores de red), `escapeHtml` (al inyectar datos del
   usuario), `confirmDialog` (reemplaza `confirm()` nativo), `showPdfViewer`.
-- Componente `js/components/CarDiagram.js`: `createCarDiagram(...)` (SVG de zonas
-  del vehículo); reutilizarlo.
+- Componente `js/components/CarDiagram.js`: `createCarDiagram(...)` (SVG **horizontal**
+  de zonas del vehículo); reutilizarlo. En la orden va junto al panel de áreas dañadas
+  (layout `.damage-map-layout`, dos columnas).
 
 ---
 
