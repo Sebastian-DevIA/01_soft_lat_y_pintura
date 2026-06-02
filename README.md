@@ -68,52 +68,60 @@ en `:8080`). El paso a paso está en [Cómo correr el proyecto](#cómo-correr-el
 ```
 01_soft_lat_y_pintura/
 ├── .github/
-│   ├── workflows/ci.yml          ← lint (flake8 + black) + tests (pytest)
-│   └── ISSUE_TEMPLATE/
+│   ├── workflows/ci.yml              ← lint (flake8 + black) + tests (pytest)
+│   └── ISSUE_TEMPLATE/bug_report.md
 ├── backend/
+│   ├── alembic.ini
+│   ├── alembic/
+│   │   ├── env.py
+│   │   ├── script.py.mako
+│   │   └── versions/
+│   │       ├── 0001_initial_schema.py   ← esquema inicial completo
+│   │       ├── 0002_vehiculo_activo.py  ← agrega vehiculos.activo (soft-delete)
+│   │       └── 0003_orden_activo.py     ← agrega ordenes_trabajo.activo (soft-delete)
 │   ├── app/
-│   │   ├── main.py              ← FastAPI app + CORS + routers
-│   │   ├── config.py            ← Settings con pydantic-settings
+│   │   ├── main.py              ← FastAPI app + CORS + registro de routers
+│   │   ├── config.py            ← Settings (pydantic-settings)
 │   │   ├── database.py          ← engine + SessionLocal + Base
 │   │   ├── models/              ← SQLAlchemy ORM (10 modelos)
-│   │   ├── schemas/             ← Pydantic v2 Request/Response
+│   │   ├── schemas/             ← Pydantic v2 Request/Response (8 dominios)
 │   │   ├── routers/             ← endpoints por dominio (8 routers)
-│   │   ├── services/            ← lógica de negocio (4 services)
-│   │   ├── dependencies/        ← get_db, get_current_user (JWT)
-│   │   └── utils/               ← hash_password, verify_password
-│   ├── templates/
-│   │   └── factura_pdf.html     ← plantilla Jinja2 para PDF
-│   ├── tests/                   ← 94 tests con SQLite en memoria
-│   ├── scripts/
-│   │   ├── create_admin.py      ← crea usuario admin inicial
-│   │   └── seed_db.py           ← datos de demo (3 clientes, 3 vehículos)
-│   └── alembic/
-│       ├── versions/
-│       │   ├── 0001_initial_schema.py  ← migración inicial completa
-│       │   ├── 0002_vehiculo_activo.py ← agrega vehiculos.activo (soft-delete)
-│       │   └── 0003_orden_activo.py    ← agrega ordenes_trabajo.activo (soft-delete)
-│       └── env.py
+│   │   ├── services/            ← lógica de negocio (5: orden, factura, pago, fase, pdf)
+│   │   ├── dependencies/        ← db.py (get_db), auth.py (get_current_user/JWT)
+│   │   └── utils/               ← security.py (hash/verify password)
+│   ├── templates/factura_pdf.html   ← plantilla Jinja2 para el PDF
+│   ├── tests/                   ← conftest (StaticPool) + 8 suites · 94 tests
+│   └── scripts/
+│       ├── create_admin.py      ← crea el usuario admin demo
+│       └── seed_db.py           ← datos de demo (clientes, vehículos, órdenes)
 ├── frontend/
-│   ├── index.html               ← SPA shell (hash routing)
+│   ├── index.html               ← SPA shell (hash routing) + filtro SVG glass
 │   ├── css/
-│   │   ├── main.css
-│   │   └── components.css
+│   │   ├── main.css             ← variables --glass-*, layout, fondo aurora, login
+│   │   └── components.css       ← vidrio en botones/cards/tablas/kanban/modales/mapa
 │   └── js/
 │       ├── api.js               ← fetch wrapper con JWT automático
-│       ├── auth.js              ← login/logout/token
+│       ├── auth.js              ← login/logout/token (valida la expiración del JWT)
 │       ├── router.js            ← hash router (#/ruta → función)
-│       ├── utils.js             ← toast, modal, formatCurrency
+│       ├── utils.js             ← toast, modal, confirmDialog, showPdfViewer, escapeHtml…
+│       ├── components/
+│       │   └── CarDiagram.js    ← mapa de daños SVG horizontal (createCarDiagram)
 │       └── pages/
 │           ├── dashboard.js     ← métricas y últimas órdenes
 │           ├── clientes.js      ← lista + búsqueda + CRUD + detalle con vehículos
-│           ├── ordenes.js       ← lista con CRUD (editar/eliminar/reactivar) + asistente "Nueva Orden" + detalle con tabs
+│           ├── ordenes.js       ← lista con CRUD (editar/eliminar/reactivar) + "Nueva Orden" + detalle con tabs
 │           ├── seguimiento.js   ← Kanban + asignación de personal a fases
 │           └── personal.js      ← tabla del equipo + edición
-├── docs/
+├── docs/diagrama-flujo.md       ← diagrama del flujo del taller
+├── scripts/dev_frontend.py      ← servidor estático del frontend SIN caché (desarrollo)
 ├── .env.example
+├── .gitignore
 ├── requirements.txt
 ├── requirements-dev.txt
-├── CLAUDE.md
+├── CLAUDE.md                    ← contexto para agentes IA (protocolo + convenciones)
+├── MEMORY.md                    ← control vivo de pendientes (qué falta / con qué seguir)
+├── README.md                    ← este archivo (documentación para humanos)
+├── LICENSE
 └── SECURITY.md
 ```
 
