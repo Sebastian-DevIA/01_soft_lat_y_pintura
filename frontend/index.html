@@ -55,11 +55,13 @@
         <a href="#/dashboard">📊 Dashboard</a>
         <a href="#/ordenes">📋 Órdenes</a>
         <a href="#/seguimiento">🚗 Seguimiento</a>
-        <a href="#/clientes">👤 Clientes</a>
-        <a href="#/personal">👷 Personal</a>
+        <a href="#/clientes" id="nav-clientes">👤 Clientes</a>
+        <a href="#/personal" id="nav-personal">👷 Personal</a>
+        <a href="#/usuarios" id="nav-usuarios" class="hidden">👥 Usuarios</a>
       </nav>
       <div class="sidebar-footer">
         <span id="user-display"></span><br>
+        <span id="user-perfil" class="text-muted" style="font-size:.72rem"></span><br>
         <a href="#" id="btn-logout" style="color:rgba(255,255,255,.6);font-size:.78rem">Cerrar sesión</a>
       </div>
     </aside>
@@ -79,13 +81,14 @@
   <div id="toast-container"></div>
 
   <script type="module">
-    import { isAuthenticated, logout, getCurrentUser, setupLoginForm } from './js/auth.js';
+    import { isAuthenticated, logout, getCurrentUser, setupLoginForm, PERFIL_LABEL } from './js/auth.js';
     import { initRouter, register } from './js/router.js';
     import { dashboard }   from './js/pages/dashboard.js';
     import { clientes }    from './js/pages/clientes.js';
     import { ordenes }     from './js/pages/ordenes.js';
     import { seguimiento } from './js/pages/seguimiento.js';
     import { personal }    from './js/pages/personal.js';
+    import { usuarios }    from './js/pages/usuarios.js';
 
     // Registrar rutas
     register('#/dashboard',   dashboard);
@@ -93,9 +96,21 @@
     register('#/seguimiento', seguimiento);
     register('#/clientes',    clientes);
     register('#/personal',    personal);
+    register('#/usuarios',    usuarios);
 
     // Setup inicial
     setupLoginForm();
+
+    // Gating del sidebar por perfil: todos ven Dashboard/Órdenes/Seguimiento; las
+    // secciones de gestión (Clientes/Personal/Usuarios) son solo para administradores.
+    function aplicarGating(user) {
+      const esAdmin = !!user.is_admin;
+      const soloAdmin = ['nav-clientes', 'nav-personal', 'nav-usuarios'];
+      soloAdmin.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.toggle('hidden', !esAdmin);
+      });
+    }
 
     async function showApp() {
       document.getElementById('login-screen').classList.add('hidden');
@@ -104,6 +119,9 @@
         const user = await getCurrentUser();
         document.getElementById('user-display').textContent = user.nombre_completo || user.username;
         document.getElementById('header-user').textContent = user.username;
+        const perfilEl = document.getElementById('user-perfil');
+        if (perfilEl) perfilEl.textContent = PERFIL_LABEL[user.perfil] || user.perfil || '';
+        aplicarGating(user);
       } catch {}
     }
 

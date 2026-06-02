@@ -96,9 +96,25 @@ Validación en `backend/app/services/orden_service.py`.
   `activo`; `DELETE` desactiva (no borra) y `GET` filtra por `?activo=`. En órdenes,
   editar (`PUT`) está vetado en `CANCELADO`/`ENTREGADO` y el `vehiculo_id` solo se
   reasigna en `PERITAJE`/`COTIZACION`.
+- **Hard-delete de órdenes**: `DELETE /api/v1/ordenes/{id}/permanente`
+  (`orden_service.eliminar_orden_permanente`) borra de verdad y exige que la orden esté
+  **inactiva** (si `activo=True` → **409**). `items` y `fases`→`asignaciones` caen por
+  cascade ORM; la **`factura` no tiene cascade** desde la orden, así que se borra
+  explícitamente antes (sus `pagos` sí caen por cascade). El front solo lo ofrece en el
+  filtro Inactivas (`data-action="eliminar-permanente"`).
 - **Esquema**: la fuente de verdad es **Alembic** (`alembic upgrade head`). Los
   scripts (`create_admin.py`/`seed_db.py`) usan `create_all`, que **no** aplica
   `ALTER` sobre tablas existentes (un `taller.db` viejo puede quedar desfasado).
+  **Alembic se corre desde `backend/`** (`script_location = alembic` y la URL son
+  relativas → `backend/taller.db`). Si la DB se creó con `create_all` no tiene
+  `alembic_version`: primero `alembic stamp 0003` y luego `alembic upgrade head`.
+- **Usuarios/roles (RBAC)**: `Usuario.perfil` ∈ {`ADMIN`, `RECEPCION`, `TECNICO`,
+  `ENTREGA`}; `ADMIN` ⇔ `is_admin=True` (lo deriva `usuario_service` al crear/editar).
+  Endpoints `*/usuarios` protegidos con `get_current_admin` (**403** si no es admin);
+  guardas **409** para que un admin no se auto-degrade ni se desactive. El RBAC
+  **operativo es gating de FRONTEND** (no seguridad dura en endpoints): `PERFIL_FASE`
+  en `js/auth.js`, sidebar en `index.html` y, en `seguimiento.js`, cada perfil solo
+  avanza su fase (admin todas). Endurecerlo en el endpoint de fases queda **pendiente**.
 
 ---
 
@@ -111,13 +127,13 @@ backend/app/
 ├── database.py      ← engine, SessionLocal, Base   (NO editar sin cuidado)
 ├── models/          ← tablas SQLAlchemy; __init__.py importa TODOS (Alembic)
 ├── schemas/         ← Pydantic v2 Request/Response
-├── routers/         ← auth, clientes, vehiculos, ordenes, facturas, pagos, fases, personal
-├── services/        ← orden_service (state machine), factura, pago, fase, pdf
-├── dependencies/    ← db.py (get_db), auth.py (get_current_user)
+├── routers/         ← auth, usuarios, clientes, vehiculos, ordenes, facturas, pagos, fases, personal
+├── services/        ← orden_service (state machine), factura, pago, fase, pdf, usuario
+├── dependencies/    ← db.py (get_db), auth.py (get_current_user, get_current_admin)
 └── utils/           ← security.py (hash/verify password)
 backend/templates/factura_pdf.html   ← plantilla Jinja2 del PDF
 backend/tests/       ← conftest (StaticPool), test_*.py
-backend/alembic/versions/   ← 0001_initial, 0002_vehiculo_activo, 0003_orden_activo
+backend/alembic/versions/   ← 0001_initial, 0002_vehiculo_activo, 0003_orden_activo, 0004_usuario_perfil
 ```
 
 **No editar sin revisar impacto:** `database.py`, `models/__init__.py`, `alembic/env.py`.
@@ -138,7 +154,9 @@ los tests **no** usan `taller.db`. Correr: `pytest backend/tests/ -v --cov=app`.
   agrega el JWT (en `localStorage`, clave `taller_token`). `auth.js` →
   `isAuthenticated()` valida la **expiración** del JWT (lee `exp`).
 - Páginas: `#/dashboard`, `#/clientes`, `#/ordenes`, `#/ordenes/:id` (tabs
-  Peritaje/Cotización/Factura/Seguimiento), `#/seguimiento` (Kanban), `#/personal`.
+  Peritaje/Cotización/Factura/Seguimiento), `#/seguimiento` (Kanban), `#/personal`,
+  `#/usuarios` (panel admin de usuarios/perfiles). El sidebar y las acciones se
+  **adaptan al perfil** del usuario (ver gotcha de RBAC).
 - **Tema glass (CSS puro, NO React)**: variables `--glass-*` en `css/main.css`
   (reutilizarlas, no hardcodear `rgba()`/blur). Patrón: `background: var(--glass-bg)`
   + `backdrop-filter: blur() saturate()` (incluir `-webkit-`) + `border` + sombra.
@@ -151,6 +169,12 @@ los tests **no** usan `taller.db`. Correr: `pytest backend/tests/ -v --cov=app`.
 - Componente `js/components/CarDiagram.js`: `createCarDiagram(...)` (SVG **horizontal**
   de zonas del vehículo); reutilizarlo. En la orden va junto al panel de áreas dañadas
   (layout `.damage-map-layout`, dos columnas).
+- **Moneda (COP)**: `formatCurrency` (en `utils.js`) usa
+  `Intl.NumberFormat('es-CO', { currency: 'COP', maximumFractionDigits: 0 })` (enteros,
+  sin centavos) — reutilizar para mostrar montos. En `ordenes.js` los inputs de
+  precio/monto se capturan en **enteros** con **vista previa en vivo** (`oninput` →
+  `formatCurrency`) y el pago valida `monto ≤ saldo` en el front. Para texto plano
+  (WhatsApp) usar el sufijo `COP` explícito (helper `copConSufijo`) y evitar el `$` solo.
 
 ---
 

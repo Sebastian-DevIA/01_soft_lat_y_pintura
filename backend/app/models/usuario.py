@@ -22,6 +22,11 @@ class Usuario(Base):
     is_admin: Mapped[bool] = mapped_column(
         Boolean, server_default=expression.false(), nullable=False
     )
+    # Perfil operativo (RBAC ligero): ADMIN, RECEPCION, TECNICO, ENTREGA.
+    # ADMIN va siempre con is_admin=True; los demás mapean a una fase del taller.
+    perfil: Mapped[str] = mapped_column(
+        String(20), server_default="RECEPCION", nullable=False
+    )
     created_at: Mapped[datetime] = mapped_column(
         server_default=func.now(), nullable=False
     )

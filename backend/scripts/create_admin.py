@@ -27,6 +27,7 @@ def main():
             nombre_completo="Administrador Taller",
             is_active=True,
             is_admin=True,
+            perfil="ADMIN",
         )
         db.add(admin)
         db.commit()

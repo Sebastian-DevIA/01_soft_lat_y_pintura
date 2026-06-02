@@ -1,5 +1,6 @@
 import { api } from '../api.js';
 import { renderLoader, renderError, toast, showModal, confirmDialog, escapeHtml } from '../utils.js';
+import { getCurrentUser, PERFIL_FASE } from '../auth.js';
 
 const FASES_ORDEN = ['INGRESO', 'REPARACION', 'ENTREGA'];
 const FASES_LABEL = { INGRESO: 'Ingreso', REPARACION: 'Reparación', ENTREGA: 'Entrega' };
@@ -30,6 +31,12 @@ export const seguimiento = {
       // Personal disponible (para los modales de asignación). Tolerante a fallo.
       const personalDisponible = await api.personal.list().catch(() => []);
 
+      // Usuario actual: define qué fase puede actualizar (admin = todas).
+      const yo = await getCurrentUser().catch(() => null);
+      const esAdmin = !!(yo && yo.is_admin);
+      const fasePermitida = esAdmin ? null : (yo ? PERFIL_FASE[yo.perfil] : null);
+      const ctx = { esAdmin, fasePermitida };
+
       // Agrupar por fase activa
       const columnas = { INGRESO: [], REPARACION: [], ENTREGA: [] };
       for (const o of ordenesConFases) {
@@ -52,7 +59,7 @@ export const seguimiento = {
                 <span class="count">${columnas[fase].length}</span>
               </div>
               <div id="col-${fase}">
-                ${columnas[fase].map(({ orden, fase: f }) => renderCard(orden, f)).join('')
+                ${columnas[fase].map(({ orden, fase: f }) => renderCard(orden, f, ctx)).join('')
                   || '<p style="font-size:.82rem;color:var(--color-muted);text-align:center;padding:16px">Sin vehículos</p>'}
               </div>
             </div>`).join('')}
@@ -115,7 +122,7 @@ function tecnicoNombre(a) {
   return nombre || a.personal_nombre || `Técnico #${a.personal_id}`;
 }
 
-function renderTecnicos(fase) {
+function renderTecnicos(fase, esAdmin) {
   const asigs = fase?.asignaciones || [];
   if (!asigs.length) {
     return '<div class="info">Sin técnicos asignados</div>';
@@ -123,15 +130,19 @@ function renderTecnicos(fase) {
   const chips = asigs.map(a => `
     <span class="badge badge-APROBACION" style="display:inline-flex;align-items:center;gap:6px">
       ${escapeHtml(tecnicoNombre(a))}
-      <button class="btn btn-danger btn-sm btn-quitar" style="padding:0 6px;line-height:1.4"
+      ${esAdmin ? `<button class="btn btn-danger btn-sm btn-quitar" style="padding:0 6px;line-height:1.4"
               data-fase-id="${fase.id}" data-personal-id="${a.personal_id}"
-              aria-label="Quitar técnico">✕</button>
+              aria-label="Quitar técnico">✕</button>` : ''}
     </span>`).join(' ');
   return `<div class="info" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">${chips}</div>`;
 }
 
-function renderCard(orden, fase) {
-  const puedeAvanzar = fase && fase.estado !== 'COMPLETADA';
+function renderCard(orden, fase, ctx) {
+  const { esAdmin, fasePermitida } = ctx;
+  // Solo el admin, o quien tenga el perfil de esa fase, puede actualizarla.
+  const fasePropia = fase && (esAdmin || fase.fase === fasePermitida);
+  const puedeAvanzar = fase && fase.estado !== 'COMPLETADA' && fasePropia;
+  const soloLectura = fase && !fasePropia;
   return `
     <div class="kanban-card" data-orden-id="${orden.id}">
       <div class="placa">${escapeHtml(vehiculoLabel(orden))}</div>
@@ -139,12 +150,13 @@ function renderCard(orden, fase) {
       <div class="info">
         ${fase ? `Fase: <strong>${escapeHtml(fase.fase)}</strong> — ${escapeHtml(fase.estado)}` : 'Sin fase asignada'}
       </div>
-      ${fase ? renderTecnicos(fase) : ''}
+      ${fase ? renderTecnicos(fase, esAdmin) : ''}
       <div class="mt-1 flex gap-1" style="flex-wrap:wrap">
         ${puedeAvanzar ? (fase.estado === 'PENDIENTE'
           ? `<button class="btn btn-accent btn-sm btn-avanzar-fase" data-fase-id="${fase.id}" data-estado="EN_PROGRESO">Iniciar</button>`
           : `<button class="btn btn-success btn-sm btn-avanzar-fase" data-fase-id="${fase.id}" data-estado="COMPLETADA">Completar</button>`) : ''}
-        ${fase ? `<button class="btn btn-outline btn-sm btn-asignar" data-fase-id="${fase.id}">+ Asignar</button>` : ''}
+        ${fase && esAdmin ? `<button class="btn btn-outline btn-sm btn-asignar" data-fase-id="${fase.id}">+ Asignar</button>` : ''}
+        ${soloLectura ? '<span class="text-muted" style="font-size:.75rem">Solo lectura (otra fase)</span>' : ''}
       </div>
     </div>`;
 }

@@ -95,6 +95,30 @@ def eliminar_orden(db: Session, orden_id: int) -> None:
     db.commit()
 
 
+def eliminar_orden_permanente(db: Session, orden_id: int) -> None:
+    """Hard-delete: borra la orden y sus dependencias de forma definitiva.
+
+    Solo aplica a órdenes ya archivadas (activo=False); una orden activa debe
+    archivarse primero (soft-delete) para evitar borrados accidentales. Items,
+    fases y asignaciones caen por cascade ORM; la factura no tiene cascade desde
+    la orden, así que se borra explícitamente (sus pagos sí caen por cascade).
+    """
+    orden = _get_orden_o_404(db, orden_id)
+    if orden.activo:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Solo se eliminan de forma permanente las órdenes archivadas. "
+                "Archívala primero."
+            ),
+        )
+    if orden.factura is not None:
+        db.delete(orden.factura)
+        db.flush()
+    db.delete(orden)
+    db.commit()
+
+
 def activar_orden(db: Session, orden_id: int) -> OrdenDetalleResponse:
     """Alterna el estado activo/inactivo de la orden (permite reactivar tras soft-delete)."""
     orden = _get_orden_o_404(db, orden_id)

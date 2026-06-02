@@ -18,5 +18,6 @@ class UsuarioResponse(BaseModel):
     nombre_completo: str | None
     is_active: bool
     is_admin: bool
+    perfil: str
 
     model_config = {"from_attributes": True}

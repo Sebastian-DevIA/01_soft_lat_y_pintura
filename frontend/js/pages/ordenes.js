@@ -21,6 +21,12 @@ const ESTADOS_NO_EDITABLES = ['CANCELADO', 'ENTREGADO'];
 let _verActivas = true;      // true = órdenes activas, false = inactivas (historial)
 let _filtroEstado = '';      // '' = todos los estados
 
+// Moneda en texto plano con sufijo COP explícito (WhatsApp/SMS): evita que el
+// símbolo "$" se confunda con dólares. formatCurrency ya da "$ 1.500.000".
+function copConSufijo(monto) {
+  return `${formatCurrency(monto)} COP`;
+}
+
 // Etiqueta legible del vehículo a partir de campos enriquecidos (con fallback seguro).
 function vehiculoLabel(o) {
   const placa = o.vehiculo_placa ? String(o.vehiculo_placa).trim() : '';
@@ -112,7 +118,8 @@ function renderFilasOrdenes(lista) {
         : `<button class="btn btn-outline btn-sm" disabled title="Las órdenes ${o.estado.toLowerCase()} no se pueden editar" aria-label="Edición no disponible">Editar</button>`,
       _verActivas
         ? `<button class="btn btn-danger btn-sm" data-id="${o.id}" data-action="eliminar" aria-label="Eliminar orden #${o.id}">Eliminar</button>`
-        : `<button class="btn btn-success btn-sm" data-id="${o.id}" data-action="reactivar" aria-label="Reactivar orden #${o.id}">Reactivar</button>`,
+        : `<button class="btn btn-success btn-sm" data-id="${o.id}" data-action="reactivar" aria-label="Reactivar orden #${o.id}">Reactivar</button>
+           <button class="btn btn-danger btn-sm" data-id="${o.id}" data-action="eliminar-permanente" aria-label="Eliminar definitivamente la orden #${o.id}">Eliminar definitivamente</button>`,
     ].join('');
     return `
     <tr>
@@ -157,6 +164,22 @@ function attachRowEvents(container) {
       try {
         await api.ordenes.activar(btn.dataset.id);
         toast('Orden reactivada', 'success');
+        renderLista(container);
+      } catch (err) { toast(err.message, 'error'); }
+    };
+  });
+  container.querySelectorAll('[data-action="eliminar-permanente"]').forEach(btn => {
+    btn.onclick = async () => {
+      const ok = await confirmDialog({
+        title: 'Eliminar definitivamente',
+        message: `La orden #${btn.dataset.id} se borrará de forma permanente, junto con su cotización, factura, pagos y fases. Esta acción NO se puede deshacer. ¿Continuar?`,
+        confirmText: 'Eliminar definitivamente',
+        confirmClass: 'btn-danger',
+      });
+      if (!ok) return;
+      try {
+        await api.ordenes.eliminarPermanente(btn.dataset.id);
+        toast('Orden eliminada definitivamente', 'success');
         renderLista(container);
       } catch (err) { toast(err.message, 'error'); }
     };
@@ -788,15 +811,20 @@ function mostrarFormularioItem(container, ordenId, item) {
       <div id="item-diagram-mount" class="mb-2"></div>
       <div class="form-group"><label>Área del vehículo*</label><input class="form-control" id="f-area" value="${escapeHtml(item?.area_vehiculo || '')}" placeholder="Ej: Puerta trasera izquierda" /></div>
       <div class="form-group"><label>Descripción*</label><input class="form-control" id="f-desc" value="${escapeHtml(item?.descripcion || '')}" placeholder="Ej: Abolladuras profundas y rayones" /></div>
-      <div class="form-group"><label>Precio unitario (COP)*</label><input class="form-control" id="f-precio" type="number" min="1" value="${escapeHtml(item?.precio_unitario ?? '')}" /></div>
-      <div class="form-group"><label>Cantidad</label><input class="form-control" id="f-cant" type="number" value="${escapeHtml(item?.cantidad ?? 1)}" min="1" /></div>`,
+      <div class="form-group">
+        <label for="f-precio">Precio unitario (COP)*</label>
+        <input class="form-control" id="f-precio" type="number" min="1" step="1" inputmode="numeric" value="${escapeHtml(item ? Math.round(item.precio_unitario) : '')}" placeholder="Ej: 150000" />
+        <p class="text-muted" id="f-precio-preview" style="font-size:.85rem;margin:4px 0 0">—</p>
+      </div>
+      <div class="form-group"><label for="f-cant">Cantidad</label><input class="form-control" id="f-cant" type="number" value="${escapeHtml(item?.cantidad ?? 1)}" min="1" step="1" inputmode="numeric" /></div>
+      <div class="totales-box"><div class="total-row total-final"><span>Subtotal</span><span id="f-subtotal-preview">—</span></div></div>`,
     confirmText: item ? 'Guardar' : 'Agregar',
     onConfirm: async (overlay) => {
       const payload = {
         area_vehiculo:   overlay.querySelector('#f-area').value.trim(),
         descripcion:     overlay.querySelector('#f-desc').value.trim(),
-        precio_unitario: parseFloat(overlay.querySelector('#f-precio').value),
-        cantidad:        parseInt(overlay.querySelector('#f-cant').value),
+        precio_unitario: Math.round(parseFloat(overlay.querySelector('#f-precio').value)),
+        cantidad:        parseInt(overlay.querySelector('#f-cant').value, 10),
       };
       if (!payload.area_vehiculo || !payload.descripcion || !(payload.precio_unitario > 0) || !(payload.cantidad >= 1)) {
         toast('Revisa los campos: área, descripción, precio > 0 y cantidad ≥ 1', 'error');
@@ -826,6 +854,22 @@ function mostrarFormularioItem(container, ordenId, item) {
       },
     }));
   }
+
+  // Vista previa en vivo en pesos colombianos: el precio formateado y el subtotal
+  // (precio × cantidad), para confirmar el monto antes de guardar.
+  const precioInput = overlay.querySelector('#f-precio');
+  const cantInput = overlay.querySelector('#f-cant');
+  const precioPreview = overlay.querySelector('#f-precio-preview');
+  const subtotalPreview = overlay.querySelector('#f-subtotal-preview');
+  const refrescarPreviews = () => {
+    const precio = Math.round(parseFloat(precioInput.value));
+    const cant = parseInt(cantInput.value, 10);
+    precioPreview.textContent = precio > 0 ? formatCurrency(precio) : '—';
+    subtotalPreview.textContent = (precio > 0 && cant >= 1) ? formatCurrency(precio * cant) : '—';
+  };
+  precioInput.addEventListener('input', refrescarPreviews);
+  cantInput.addEventListener('input', refrescarPreviews);
+  refrescarPreviews();
 }
 
 function mostrarFormularioDescuento(container, ordenId, orden) {
@@ -896,9 +940,9 @@ function compartirFactura(orden, f) {
     `*Taller LatonPaint* — Factura ${f.numero_factura}`,
     orden.cliente_nombre ? `Cliente: ${orden.cliente_nombre}` : null,
     orden.vehiculo_placa ? `Vehículo: ${orden.vehiculo_placa} (${orden.vehiculo_descripcion || ''})`.trim() : null,
-    `Total: ${formatCurrency(f.monto_total)}`,
-    `Pagado: ${formatCurrency(f.monto_pagado)}`,
-    `Saldo pendiente: ${formatCurrency(pendiente)}`,
+    `Total: ${copConSufijo(f.monto_total)}`,
+    `Pagado: ${copConSufijo(f.monto_pagado)}`,
+    `Saldo pendiente: ${copConSufijo(pendiente)}`,
     f.estado === 'PAGADA'
       ? '✅ Factura PAGADA. El vehículo puede ser entregado.'
       : 'El vehículo se entrega al cancelar el saldo pendiente.',
@@ -909,11 +953,20 @@ function compartirFactura(orden, f) {
 }
 
 function mostrarFormularioPago(div, factura, ordenId, container) {
-  showModal({
+  // El peso colombiano no usa centavos: trabajamos en enteros. Pre-llenamos con el saldo.
+  const saldo = Math.round(factura.monto_total - factura.monto_pagado);
+  const overlay = showModal({
     title: 'Registrar Pago',
     body: `
-      <p class="mb-2 text-muted">Saldo pendiente: <strong>${formatCurrency(factura.monto_total - factura.monto_pagado)}</strong></p>
-      <div class="form-group"><label>Monto*</label><input class="form-control" id="f-monto" type="number" step="0.01" min="1" /></div>
+      <p class="mb-2 text-muted">Saldo pendiente: <strong>${formatCurrency(saldo)}</strong></p>
+      <div class="form-group">
+        <label for="f-monto">Monto (COP)*</label>
+        <input class="form-control" id="f-monto" type="number" step="1" min="1" max="${saldo}" value="${saldo}" inputmode="numeric" />
+        <div class="flex justify-between align-center mt-1">
+          <span class="text-muted" id="f-monto-preview" style="font-size:.85rem">—</span>
+          <button type="button" class="btn btn-outline btn-sm" id="f-pagar-todo">Pagar saldo completo</button>
+        </div>
+      </div>
       <div class="form-group"><label>Tipo</label>
         <select class="form-control" id="f-tipo"><option>ADELANTO</option><option>SALDO</option><option>ABONO</option></select>
       </div>
@@ -923,9 +976,18 @@ function mostrarFormularioPago(div, factura, ordenId, container) {
     confirmText: 'Registrar',
     confirmClass: 'btn-success',
     onConfirm: async (overlay) => {
+      const monto = Math.round(parseFloat(overlay.querySelector('#f-monto').value));
+      if (!(monto > 0)) {
+        toast('Ingresa un monto válido mayor a 0', 'error');
+        return false;
+      }
+      if (monto > saldo) {
+        toast(`El monto no puede superar el saldo pendiente (${formatCurrency(saldo)})`, 'error');
+        return false;
+      }
       const payload = {
         factura_id: factura.id,
-        monto:      parseFloat(overlay.querySelector('#f-monto').value),
+        monto,
         tipo:       overlay.querySelector('#f-tipo').value,
         metodo:     overlay.querySelector('#f-metodo').value,
       };
@@ -933,7 +995,18 @@ function mostrarFormularioPago(div, factura, ordenId, container) {
         await api.pagos.create(payload);
         toast('Pago registrado', 'success');
         await cargarFactura(container, ordenId);
-      } catch (err) { toast(err.message, 'error'); }
+      } catch (err) { toast(err.message, 'error'); return false; }
     }
   });
+
+  // Vista previa del monto en COP y atajo "pagar saldo completo".
+  const montoInput = overlay.querySelector('#f-monto');
+  const montoPreview = overlay.querySelector('#f-monto-preview');
+  const refrescarMonto = () => {
+    const v = Math.round(parseFloat(montoInput.value));
+    montoPreview.textContent = v > 0 ? formatCurrency(v) : '—';
+  };
+  montoInput.addEventListener('input', refrescarMonto);
+  overlay.querySelector('#f-pagar-todo').onclick = () => { montoInput.value = saldo; refrescarMonto(); };
+  refrescarMonto();
 }
