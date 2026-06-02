@@ -248,6 +248,10 @@ proyecto es Vanilla por diseño).
 
 ## Pendientes (roadmap)
 
+> 📌 **Punto de partida de cada iteración.** Esta es la lista viva de lo que falta y
+> se revisa al inicio de cada sesión de trabajo. (La misma lista, orientada a agentes
+> IA, vive en `CLAUDE.md`.)
+
 Mejoras anotadas para una próxima iteración (**aún no implementadas**):
 
 | # | Pendiente | Descripción |

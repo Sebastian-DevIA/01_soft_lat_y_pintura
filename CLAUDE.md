@@ -135,7 +135,11 @@ La state machine se opera por UI vía `PATCH /ordenes/{id}/estado` (incluye CANC
 
 ---
 
-## Pendientes (próxima iteración)
+## Pendientes (roadmap)
+
+> **Punto de partida de cada chat/iteración.** Antes de empezar cualquier trabajo,
+> revisa primero esta sección (y la equivalente en `README.md`): es la lista viva de
+> lo que falta. Al completar un pendiente, quítalo de aquí y de `README.md`.
 
 Tareas anotadas para continuar más tarde. **No están implementadas todavía.**
 
