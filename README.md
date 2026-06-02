@@ -240,12 +240,14 @@ proyecto es Vanilla por diseño).
   (`wa.me`), sin necesidad de servidor de correo.
 
 ### Mapa de daños del vehículo (SVG interactivo)
-- Componente `frontend/js/components/CarDiagram.js`: vista superior de un carro con
-  zonas clicables (capó, techo, baúl, 4 puertas, 4 guardabarros, 2 paragolpes), cada una
-  con su **nombre**. Accesible (teclado, `role`/`aria-label`).
+- Componente `frontend/js/components/CarDiagram.js`: vista superior **horizontal
+  (apaisada)** de un carro con zonas clicables (capó, techo, baúl, 4 puertas, 4
+  guardabarros, 2 paragolpes), cada una con su **nombre**. Accesible (teclado,
+  `role`/`aria-label`).
 - En el **peritaje**, al registrar un área dañada se selecciona la zona en el diagrama
   (rellena el campo `area_vehiculo`); también se puede escribir libremente otra parte.
-- En la vista de la orden, las zonas con daño registrado se resaltan en rojo (solo lectura).
+- En la vista de la orden, el diagrama se muestra en **dos columnas** junto a un panel
+  con la **lista de áreas dañadas**; las zonas con daño se resaltan en rojo (solo lectura).
 
 ---
 
@@ -255,12 +257,7 @@ proyecto es Vanilla por diseño).
 > fuente única de lo que falta. Al completar un punto se marca y se elimina de allí, y
 > se actualizan este README y `CLAUDE.md` si cambian hechos del proyecto.
 
-Pendientes actuales (resumen — ver detalle y estado en [`MEMORY.md`](MEMORY.md)):
-
-| # | Pendiente | Descripción |
-|---|-----------|-------------|
-| 1 | Mapa de daños en **horizontal** | El diagrama del vehículo está en vertical; dejarlo en **orientación horizontal** (vista superior apaisada). |
-| 2 | Áreas dañadas **junto al mapa** | Mostrar la visualización de las zonas dañadas **al lado** del diagrama del carro (dos columnas) para que sea más visible. |
+_Sin pendientes abiertos actualmente — el control vivo está en [`MEMORY.md`](MEMORY.md)._
 
 ---
 

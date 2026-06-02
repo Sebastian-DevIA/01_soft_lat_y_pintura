@@ -624,13 +624,40 @@ async function renderDetalle(container, ordenId) {
   }
 }
 
+// Panel lateral: lista legible de las zonas dañadas registradas en el peritaje.
+function renderListaDanios(items) {
+  if (!items.length) {
+    return `<p class="text-muted" style="font-size:.85rem">Sin áreas dañadas registradas.</p>`;
+  }
+  return `<ul class="damage-list">${items.map(i => {
+    const detalle = [
+      i.descripcion ? escapeHtml(i.descripcion) : '',
+      i.precio_unitario ? formatCurrency(i.precio_unitario) : '',
+    ].filter(Boolean).join(' · ');
+    return `
+      <li class="damage-list-item">
+        <span class="damage-dot" aria-hidden="true"></span>
+        <div>
+          <strong>${escapeHtml(i.area_vehiculo)}</strong>
+          ${detalle ? `<span class="damage-detail">${detalle}</span>` : ''}
+        </div>
+      </li>`;
+  }).join('')}</ul>`;
+}
+
 function renderTabPeritaje(orden) {
   const puedeEditar = ['PERITAJE', 'COTIZACION'].includes(orden.estado);
   return `
     <div class="card mb-2">
       <h3 class="mb-2">Mapa de daños del vehículo</h3>
       <p class="text-muted mb-2" style="font-size:.85rem">Las zonas marcadas en rojo tienen daño registrado en el peritaje.</p>
-      <div id="peritaje-diagram-mount"></div>
+      <div class="damage-map-layout">
+        <div id="peritaje-diagram-mount"></div>
+        <div class="damage-map-side">
+          <h4 class="damage-side-title">Áreas dañadas (${orden.items.length})</h4>
+          ${renderListaDanios(orden.items)}
+        </div>
+      </div>
     </div>
     <div class="card">
       <div class="card-header">
